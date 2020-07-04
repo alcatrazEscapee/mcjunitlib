@@ -1,0 +1,103 @@
+buildscript {
+    repositories {
+        maven { url = 'https://files.minecraftforge.net/maven' }
+        jcenter()
+        mavenCentral()
+    }
+    dependencies {
+        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '3.+', changing: true
+    }
+}
+
+plugins {
+    id 'idea'
+    id 'maven-publish'
+}
+apply plugin: 'net.minecraftforge.gradle'
+
+/**
+ * Version in dev is set to 'dev'
+ * Any builds produced by the github actions build script will have a version matching their tag.
+ * All version numbers should be Semantic Versioning 2.0 compliant
+ */
+if (System.getenv('VERSION') != null) {
+    version = System.getenv('VERSION')
+} else {
+    version = 'dev'
+}
+group = 'com.alcatrazescapee.mcjunitlib' // http://maven.apache.org/guides/mini/guide-naming-conventions.html
+archivesBaseName = "mcjunitlib-${mc_version}"
+
+sourceCompatibility = targetCompatibility = compileJava.sourceCompatibility = compileJava.targetCompatibility = '1.8' // Need this here so eclipse task generates correctly.
+
+minecraft {
+    mappings channel: 'snapshot', version: '20200408-1.15.1'
+    // makeObfSourceJar = false // an Srg named sources jar is made by default. uncomment this to disable.
+    // accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
+
+    // Run configurations
+    runs {
+        server {
+            workingDirectory project.file('run')
+            property 'forge.logging.console.level', 'debug'
+            mods {
+                suckeggs {
+                    sources sourceSets.main
+                }
+            }
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    minecraft "net.minecraftforge:forge:${mc_version}-${forge_version}"
+
+    implementation 'org.junit.platform:junit-platform-launcher:1.6.2'
+    implementation 'org.junit.jupiter:junit-jupiter-engine:5.4.2'
+}
+
+test {
+    useJUnitPlatform()
+    workingDir = 'run'
+}
+
+// Puts the mod version into the jar for mods.toml to read from
+jar {
+    manifest {
+        attributes([
+            "Implementation-Version": "${version}",
+            "FMLModType": "LIBRARY"
+        ])
+    }
+}
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+    classifier = 'sources'
+    from sourceSets.main.allSource
+}
+
+jar.finalizedBy('reobfJar')
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+
+            groupId = 'com.alcatrazescapee.mcjunitlib'
+            artifactId = "mc-junit-lib-1.15.2"
+            version = "${version}"
+
+            // Adds the sources as an artifact.
+            artifact sourcesJar {
+                classifier 'sources'
+            }
+        }
+    }
+    repositories {
+        mavenLocal()
+    }
+}
