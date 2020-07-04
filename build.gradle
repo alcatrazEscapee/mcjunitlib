@@ -56,6 +56,7 @@ repositories {
 dependencies {
     minecraft "net.minecraftforge:forge:${mc_version}-${forge_version}"
 
+    implementation 'org.junit.jupiter:junit-jupiter-api:5.4.2'
     implementation 'org.junit.platform:junit-platform-launcher:1.6.2'
     implementation 'org.junit.jupiter:junit-jupiter-engine:5.4.2'
 }
@@ -78,6 +79,22 @@ jar {
 task sourcesJar(type: Jar, dependsOn: classes) {
     classifier = 'sources'
     from sourceSets.main.allSource
+}
+
+jar {
+    // Include the full JUnit classpath in the jar
+    // This is done so the TransformingClassLoader will properly load these classes and not cause classloading leaks into test code or minecraft source code
+    // It also means it's easier to specify dependencies on this project, as transitive dependencies do not work correctly with fg.deobf()
+    from {
+        configurations.compileClasspath.filter({ File file ->
+            println file
+            println file.toPath().toString()
+            println file.exists() && !file.toPath().toString().contains('net\\minecraftforge\\forge')
+            file.exists() && !file.toPath().toString().contains('net\\minecraftforge\\forge')
+        }).collect({ File file ->
+            file.isDirectory() ? file : zipTree(file)
+        })
+    }
 }
 
 jar.finalizedBy('reobfJar')

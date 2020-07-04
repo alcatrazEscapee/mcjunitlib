@@ -1,14 +1,13 @@
 package com.alcatrazescapee.mcjunitlib;
 
-import java.lang.reflect.InvocationTargetException;
-import java.util.ArrayList;
-import java.util.List;
+import java.nio.file.Paths;
+import java.util.Collections;
 
-import org.apache.logging.log4j.*;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
-import org.junit.platform.engine.DiscoverySelector;
 import org.junit.platform.engine.TestExecutionResult;
-import org.junit.platform.engine.discovery.ClassNameFilter;
 import org.junit.platform.engine.discovery.DiscoverySelectors;
 import org.junit.platform.launcher.*;
 import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
@@ -18,34 +17,26 @@ import org.junit.platform.launcher.listeners.TestExecutionSummary;
 
 public class JUnitTestRunner implements TestExecutionListener
 {
-    public static void register(Class<?> testClass)
-    {
-        TEST_CLASSES.add(testClass);
-    }
-
-    private static final List<Class<?>> TEST_CLASSES = new ArrayList<>();
-
     private static final Level UNIT_TEST = Level.forName("UNITTEST", 50);
     private static final Logger LOGGER = LogManager.getLogger();
 
     public void runAllTests()
     {
-        LOGGER.log(UNIT_TEST, "Asking for Unit Test Classes...");
-
-        try
-        {
-            Class.forName("com.alcatrazescapee.suckeggs.SuckEggsTest").getMethod("main").invoke(null);
-        }
-        catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException | ClassNotFoundException e)
-        {
-            LOGGER.log(UNIT_TEST, "Unable to ask for tests");
-            LOGGER.log(UNIT_TEST, e);
-        }
-
         LOGGER.log(UNIT_TEST, "Running Unit Tests...");
 
         LauncherDiscoveryRequest request = LauncherDiscoveryRequestBuilder.request()
-            .selectors(TEST_CLASSES.stream().map(DiscoverySelectors::selectClass).toArray(DiscoverySelector[]::new))
+            .selectors(
+                DiscoverySelectors.selectDirectory("./build/classes/java/test"),
+                DiscoverySelectors.selectClass("com.alcatrazescapee.suckeggs.SuckEggsTests"),
+                DiscoverySelectors.selectPackage("com.alcatrazescapee.suckeggs"),
+                DiscoverySelectors.selectClasspathResource("../build/classes/java/test")
+            )
+            .selectors(DiscoverySelectors.selectClasspathRoots(Collections.singleton(Paths.get("C:\\Users\\alex\\Documents\\Projects\\Minecraft\\Mods\\suckeggs-1.15\\build\\classes\\java\\test"))))
+            //.selectors(DiscoverySelectors.selectClasspathRoots(
+            //    Arrays.stream(System.getProperty("java.class.path").split(";"))
+            //        .map(x -> Paths.get(x))
+            //        .collect(Collectors.toSet())
+            //))
             .build();
         Launcher launcher = LauncherFactory.create();
         TestPlan testPlan = launcher.discover(request);
