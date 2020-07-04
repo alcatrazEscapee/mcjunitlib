@@ -1,3 +1,8 @@
+/*
+ * Part of MCJUnitLib by AlcatrazEscapee
+ * Work under Copyright. See the project LICENSE.md for details.
+ */
+
 package com.alcatrazescapee.mcjunitlib;
 
 import java.awt.*;

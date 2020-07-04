@@ -1,3 +1,8 @@
+/*
+ * Part of MCJUnitLib by AlcatrazEscapee
+ * Work under Copyright. See the project LICENSE.md for details.
+ */
+
 package com.alcatrazescapee.mcjunitlib;
 
 import java.lang.reflect.InvocationTargetException;
@@ -5,7 +10,9 @@ import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Locale;
 
-import org.apache.logging.log4j.*;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import cpw.mods.modlauncher.Launcher;
 
