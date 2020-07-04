@@ -10,7 +10,6 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Optional;
 import java.util.UUID;
-
 import javax.annotation.Nullable;
 
 import org.apache.logging.log4j.Level;
@@ -44,16 +43,6 @@ public class DedicatedTestServer extends DedicatedServer
     public static void main(String[] args)
     {
         LOGGER.log(UNIT_TEST, "Dedicated Test Server Starting");
-
-        // Class load order
-        try
-        {
-            Class.forName("net.minecraft.server.MinecraftServer");
-        }
-        catch (ClassNotFoundException e)
-        {
-            throw new RuntimeException(e);
-        }
 
         OptionParser optionparser = new OptionParser();
         OptionSpec<Void> optionspec = optionparser.accepts("nogui");

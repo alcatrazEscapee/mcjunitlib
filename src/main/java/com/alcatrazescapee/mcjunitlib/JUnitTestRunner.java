@@ -19,18 +19,19 @@ public class JUnitTestRunner implements TestExecutionListener
 {
     private static final Level UNIT_TEST = Level.forName("UNITTEST", 50);
     private static final Logger LOGGER = LogManager.getLogger();
+    private static final String HR = "--------------------------------------------------";
 
     public void runAllTests()
     {
         LOGGER.log(UNIT_TEST, "Running Unit Tests...");
 
         LauncherDiscoveryRequest request = LauncherDiscoveryRequestBuilder.request()
-            .selectors(
-                DiscoverySelectors.selectDirectory("./build/classes/java/test"),
-                DiscoverySelectors.selectClass("com.alcatrazescapee.suckeggs.SuckEggsTests"),
-                DiscoverySelectors.selectPackage("com.alcatrazescapee.suckeggs"),
-                DiscoverySelectors.selectClasspathResource("../build/classes/java/test")
-            )
+            //.selectors(
+            //    DiscoverySelectors.selectDirectory("./build/classes/java/test"),
+            //    DiscoverySelectors.selectClass("com.alcatrazescapee.suckeggs.SuckEggsTests"),
+            //    DiscoverySelectors.selectPackage("com.alcatrazescapee.suckeggs"),
+            //    DiscoverySelectors.selectClasspathResource("../build/classes/java/test")
+            //)
             .selectors(DiscoverySelectors.selectClasspathRoots(Collections.singleton(Paths.get("C:\\Users\\alex\\Documents\\Projects\\Minecraft\\Mods\\suckeggs-1.15\\build\\classes\\java\\test"))))
             //.selectors(DiscoverySelectors.selectClasspathRoots(
             //    Arrays.stream(System.getProperty("java.class.path").split(";"))
@@ -48,19 +49,36 @@ public class JUnitTestRunner implements TestExecutionListener
             TestExecutionSummary summary = summaryListener.getSummary();
             long timeMillis = summary.getTimeFinished() - summary.getTimeStarted();
 
-            LOGGER.log(UNIT_TEST, "Summary");
-            LOGGER.log(UNIT_TEST, "Found {} Tests: Passed / Failed = {} / {}, Aborted = {}, Skipped = {}", summary.getTestsFoundCount(), summary.getTestsSucceededCount(), summary.getTestsFailedCount(), summary.getTestsAbortedCount(), summary.getTestsSkippedCount());
-            LOGGER.log(UNIT_TEST, "Finished Execution in {} s ({} ms)", timeMillis / 1000, timeMillis);
-
             if (!summary.getFailures().isEmpty())
             {
+                LOGGER.log(UNIT_TEST, HR);
                 LOGGER.log(UNIT_TEST, "Failures:");
+                int count = 1, total = summary.getFailures().size();
                 for (TestExecutionSummary.Failure failure : summary.getFailures())
                 {
-                    LOGGER.log(UNIT_TEST, "Name: {}", failure.getTestIdentifier().getDisplayName());
-                    LOGGER.log(UNIT_TEST, "Reason", failure.getException());
+                    LOGGER.log(UNIT_TEST, "{} / {} | {} Failed: {}", count, total, failure.getTestIdentifier().getDisplayName(), failure.getException().getMessage());
+                    LOGGER.log(UNIT_TEST, "Failure Reason:", failure.getException());
+                    count++;
                 }
             }
+
+            LOGGER.log(UNIT_TEST, HR);
+            LOGGER.log(UNIT_TEST, "Summary");
+            LOGGER.log(UNIT_TEST, "Found {} Tests", summary.getTestsFoundCount());
+            LOGGER.log(UNIT_TEST, " - {} / {} Passed ({})", summary.getTestsSucceededCount(), summary.getTestsFoundCount(), String.format("%02d%%", (int) (100f * summary.getTestsSucceededCount() / summary.getTestsFoundCount())));
+            if (summary.getTestsFailedCount() > 0)
+            {
+                LOGGER.log(UNIT_TEST, " - {} / {} Failed ({}%)", summary.getTestsFailedCount(), summary.getTestsFoundCount(), String.format("%02d%%", (int) (100f * summary.getTestsFailedCount() / summary.getTestsFoundCount())));
+            }
+            if (summary.getTestsSkippedCount() > 0)
+            {
+                LOGGER.log(UNIT_TEST, " - {} / {} Skipped ({}%)", summary.getTestsSkippedCount(), summary.getTestsFoundCount(), String.format("%02d%%", (int) (100f * summary.getTestsSkippedCount() / summary.getTestsFoundCount())));
+            }
+            if (summary.getTestsAbortedCount() > 0)
+            {
+                LOGGER.log(UNIT_TEST, " - {} / {} Aborted ({}%)", summary.getTestsAbortedCount(), summary.getTestsFoundCount(), String.format("%02d%%", (int) (100f * summary.getTestsAbortedCount() / summary.getTestsFoundCount())));
+            }
+            LOGGER.log(UNIT_TEST, "Finished Execution in {} s ({} ms)", timeMillis / 1000, timeMillis);
         }
         else
         {
@@ -71,17 +89,17 @@ public class JUnitTestRunner implements TestExecutionListener
     @Override
     public void testPlanExecutionStarted(TestPlan testPlan)
     {
-        LOGGER.log(UNIT_TEST, "----------------------------");
-        LOGGER.log(UNIT_TEST, "Starting Test Plan Execution with {} tests", testPlan.countTestIdentifiers(x -> true));
-        LOGGER.log(UNIT_TEST, "----------------------------");
+        LOGGER.log(UNIT_TEST, HR);
+        LOGGER.log(UNIT_TEST, "Starting Test Plan Execution with {} tests", testPlan.countTestIdentifiers(TestIdentifier::isTest));
+        LOGGER.log(UNIT_TEST, HR);
     }
 
     @Override
     public void testPlanExecutionFinished(TestPlan testPlan)
     {
-        LOGGER.log(UNIT_TEST, "----------------------------");
+        LOGGER.log(UNIT_TEST, HR);
         LOGGER.log(UNIT_TEST, "Finished Test Plan Execution");
-        LOGGER.log(UNIT_TEST, "----------------------------");
+        LOGGER.log(UNIT_TEST, HR);
     }
 
     @Override
@@ -105,6 +123,6 @@ public class JUnitTestRunner implements TestExecutionListener
     @Override
     public void executionFinished(TestIdentifier testIdentifier, TestExecutionResult testExecutionResult)
     {
-        LOGGER.log(UNIT_TEST, "Finished running test {}", testIdentifier);
+        LOGGER.log(UNIT_TEST, "Finished running test {}", testIdentifier.getDisplayName());
     }
 }
