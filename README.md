@@ -6,16 +6,15 @@ This is a library designed to make it possible to test Minecraft Forge mods usin
 
 This assumes you already have a basic `build.gradle` mod workspace set up.
 
-First, you must add this library a test dependency. Make sure to replace `MINECRAFT_VERSION` and `VERSION` with the version you want to use (e.g. `1.15.2` and `0.1.19`):
+First, you must add this library a test dependency. Make sure to replace `MINECRAFT_VERSION` and `VERSION` with the version you want to use (e.g. `1.15.2` and `1.0.0`):
 
 ```groovy
-// At the moment I have not setup a public maven for this. So the next best thing is to clone this project and run publishToMavenLocal, include mavenLocal() here, and it will work. todo: maven
 repositories {
-    mavenLocal()
+    maven { url 'https://jitpack.io' }
 }
 
 dependencies {
-    testImplementation fg.deobf('com.alcatrazescapee.mcjunitlib:mc-junit-lib-MINECRAFT_VERSION:VERSION') {
+    testImplementation fg.deobf('com.github.alcatrazEscapee:mcjunitlib:VERSION-MINECRAFT_VERSION') {
         transitive = false
     }
 }

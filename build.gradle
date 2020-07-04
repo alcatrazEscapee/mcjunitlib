@@ -25,8 +25,8 @@ if (System.getenv('VERSION') != null) {
 } else {
     version = 'dev'
 }
-group = 'com.alcatrazescapee.mcjunitlib' // http://maven.apache.org/guides/mini/guide-naming-conventions.html
-archivesBaseName = "mcjunitlib-${mc_version}"
+group = 'com.github.alcatrazEscapee'
+archivesBaseName = 'mcjunitlib'
 
 sourceCompatibility = targetCompatibility = compileJava.sourceCompatibility = compileJava.targetCompatibility = '1.8' // Need this here so eclipse task generates correctly.
 
