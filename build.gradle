@@ -82,8 +82,8 @@ publishing {
         mavenJava(MavenPublication) {
             from components.java
 
-            groupId = 'com.alcatrazescapee.mcjunitlib'
-            artifactId = "mc-junit-lib-1.15.2"
+            groupId = 'com.github.alcatrazEscapee'
+            artifactId = "mcjunitlib"
             version = "${version}"
 
             // Adds the sources as an artifact.
