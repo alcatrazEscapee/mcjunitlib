@@ -31,6 +31,8 @@ import net.minecraft.util.datafix.DataFixesManager;
 import net.minecraft.util.registry.Bootstrap;
 import net.minecraft.world.chunk.listener.IChunkStatusListenerFactory;
 import net.minecraft.world.chunk.listener.LoggingChunkStatusListener;
+import net.minecraftforge.fml.StartupQuery.AbortedException;
+import net.minecraftforge.fml.server.ServerLifecycleHooks;
 
 import com.mojang.authlib.GameProfileRepository;
 import com.mojang.authlib.minecraft.MinecraftSessionService;
@@ -65,9 +67,11 @@ public class DedicatedTestServer extends DedicatedServer
         OptionSpec<String> optionspec12 = optionparser.nonOptions();
         optionparser.accepts("gameDir").withRequiredArg().ofType(File.class).defaultsTo(new File(".")); //Forge: Consume this argument, we use it in the launcher, and the client side.
 
-        try {
+        try
+        {
             OptionSet optionset = optionparser.parse(args);
-            if (optionset.has(optionspec6)) {
+            if (optionset.has(optionspec6))
+            {
                 optionparser.printHelpOn(System.err);
                 return;
             }
@@ -77,13 +81,15 @@ public class DedicatedTestServer extends DedicatedServer
             if (optionset.has(optionspec1) || !Files.exists(path)) serverpropertiesprovider.save();
             Path path1 = Paths.get("eula.txt");
             ServerEula servereula = new ServerEula(path1);
-            if (optionset.has(optionspec1)) {
-                LOGGER.info("Initialized '" + path.toAbsolutePath().toString() + "' and '" + path1.toAbsolutePath().toString() + "'");
+            if (optionset.has(optionspec1))
+            {
+                LOGGER.log(UNIT_TEST, "Initialized '" + path.toAbsolutePath().toString() + "' and '" + path1.toAbsolutePath().toString() + "'");
                 return;
             }
 
-            if (!servereula.hasAcceptedEULA()) {
-                LOGGER.info("You need to agree to the EULA in order to run the server. Go to eula.txt for more info.");
+            if (!servereula.hasAcceptedEULA())
+            {
+                LOGGER.log(UNIT_TEST, "Error: You need to agree to the EULA in order to run the server. Go to eula.txt for more info.");
                 return;
             }
 
@@ -95,86 +101,112 @@ public class DedicatedTestServer extends DedicatedServer
             MinecraftSessionService minecraftsessionservice = yggdrasilauthenticationservice.createMinecraftSessionService();
             GameProfileRepository gameprofilerepository = yggdrasilauthenticationservice.createProfileRepository();
             PlayerProfileCache playerprofilecache = new PlayerProfileCache(gameprofilerepository, new File(s, USER_CACHE_FILE.getName()));
-            String s1 = Optional.ofNullable(optionset.valueOf(optionspec9)).orElse(serverpropertiesprovider.getProperties().worldName);
-            if (s1 == null || s1.isEmpty() || new File(s, s1).getAbsolutePath().equals(new File(s).getAbsolutePath())) {
-                LOGGER.error("Invalid world directory specified, must not be null, empty or the same directory as your universe! " + s1);
+            String worldName = Optional.ofNullable(optionset.valueOf(optionspec9)).orElse(serverpropertiesprovider.getProperties().worldName);
+            if (worldName == null || worldName.isEmpty() || new File(s, worldName).getAbsolutePath().equals(new File(s).getAbsolutePath()))
+            {
+                LOGGER.log(UNIT_TEST, "Error: Invalid world directory specified, must not be null, empty or the same directory as your universe! " + worldName);
                 return;
             }
-            final DedicatedTestServer dedicatedserver = new DedicatedTestServer(new File(s), serverpropertiesprovider, DataFixesManager.getDataFixer(), yggdrasilauthenticationservice, minecraftsessionservice, gameprofilerepository, playerprofilecache, LoggingChunkStatusListener::new, s1);
-            dedicatedserver.setServerOwner(optionset.valueOf(optionspec7));
-            dedicatedserver.setServerPort(optionset.valueOf(optionspec10));
-            dedicatedserver.setDemo(optionset.has(optionspec2));
-            dedicatedserver.canCreateBonusChest(optionset.has(optionspec3));
-            dedicatedserver.setForceWorldUpgrade(optionset.has(optionspec4));
-            dedicatedserver.setEraseCache(optionset.has(optionspec5));
-            dedicatedserver.setServerId(optionset.valueOf(optionspec11));
+            final DedicatedTestServer dedicatedServer = new DedicatedTestServer(new File(s), serverpropertiesprovider, DataFixesManager.getDataFixer(), yggdrasilauthenticationservice, minecraftsessionservice, gameprofilerepository, playerprofilecache, LoggingChunkStatusListener::new, worldName);
+            dedicatedServer.setServerOwner(optionset.valueOf(optionspec7));
+            dedicatedServer.setServerPort(optionset.valueOf(optionspec10));
+            dedicatedServer.setDemo(optionset.has(optionspec2));
+            dedicatedServer.canCreateBonusChest(optionset.has(optionspec3));
+            dedicatedServer.setForceWorldUpgrade(optionset.has(optionspec4));
+            dedicatedServer.setEraseCache(optionset.has(optionspec5));
+            dedicatedServer.setServerId(optionset.valueOf(optionspec11));
             boolean flag = !optionset.has(optionspec) && !optionset.valuesOf(optionspec12).contains("nogui");
-            if (flag && !GraphicsEnvironment.isHeadless()) {
-                dedicatedserver.setGuiEnabled();
+            if (flag && !GraphicsEnvironment.isHeadless())
+            {
+                dedicatedServer.setGuiEnabled();
             }
 
-            dedicatedserver.startServerThread();
-            Thread thread = new Thread("Server Shutdown Thread") {
-                public void run() {
-                    dedicatedserver.initiateShutdown(true);
+            dedicatedServer.startServerThread();
+            Thread thread = new Thread("Server Shutdown Thread")
+            {
+                public void run()
+                {
+                    dedicatedServer.initiateShutdown(true);
                     LogManager.shutdown(); // we're manually managing the logging shutdown on the server. Make sure we do it here at the end.
                 }
             };
             thread.setUncaughtExceptionHandler(new DefaultUncaughtExceptionHandler(LOGGER));
             Runtime.getRuntime().addShutdownHook(thread);
-        } catch (Exception exception) {
-            LOGGER.fatal("Failed to start the minecraft server", exception);
+        }
+        catch (Exception exception)
+        {
+            LOGGER.log(UNIT_TEST, "Error: Failed to start the minecraft server", exception);
         }
     }
 
-    private DedicatedTestServer(File p_i50720_1_, ServerPropertiesProvider p_i50720_2_, DataFixer dataFixerIn, YggdrasilAuthenticationService p_i50720_4_, MinecraftSessionService p_i50720_5_, GameProfileRepository p_i50720_6_, PlayerProfileCache p_i50720_7_, IChunkStatusListenerFactory p_i50720_8_, String p_i50720_9_)
+    private DedicatedTestServer(File file, ServerPropertiesProvider serverPropertiesProvider, DataFixer dataFixerIn, YggdrasilAuthenticationService auth, MinecraftSessionService session, GameProfileRepository profileRepository, PlayerProfileCache profileCache, IChunkStatusListenerFactory chunkListener, String worldName)
     {
-        super(p_i50720_1_, p_i50720_2_, dataFixerIn, p_i50720_4_, p_i50720_5_, p_i50720_6_, p_i50720_7_, p_i50720_8_, p_i50720_9_);
+        super(file, serverPropertiesProvider, dataFixerIn, auth, session, profileRepository, profileCache, chunkListener, worldName);
     }
 
     @Override
     public void run()
     {
         LOGGER.log(UNIT_TEST, "DedicatedTestServer -> ServerThread Starting");
-        try {
-            if (this.init()) {
-                net.minecraftforge.fml.server.ServerLifecycleHooks.handleServerStarted(this);
+        try
+        {
+            if (init())
+            {
+                ServerLifecycleHooks.handleServerStarted(this);
                 new JUnitTestRunner().runAllTests();
-                net.minecraftforge.fml.server.ServerLifecycleHooks.handleServerStopping(this);
-                net.minecraftforge.fml.server.ServerLifecycleHooks.expectServerStopped(); // has to come before finalTick to avoid race conditions
-            } else {
-                net.minecraftforge.fml.server.ServerLifecycleHooks.expectServerStopped(); // has to come before finalTick to avoid race conditions
-                this.finalTick(null);
+                ServerLifecycleHooks.handleServerStopping(this);
+                ServerLifecycleHooks.expectServerStopped(); // has to come before finalTick to avoid race conditions
             }
-        } catch (net.minecraftforge.fml.StartupQuery.AbortedException e) {
-            // ignore silently
-            net.minecraftforge.fml.server.ServerLifecycleHooks.expectServerStopped(); // has to come before finalTick to avoid race conditions
-        } catch (Throwable throwable1) {
+            else
+            {
+                ServerLifecycleHooks.expectServerStopped(); // has to come before finalTick to avoid race conditions
+                finalTick(null);
+            }
+        }
+        catch (AbortedException e)
+        {
+            ServerLifecycleHooks.expectServerStopped(); // has to come before finalTick to avoid race conditions
+        }
+        catch (Throwable throwable1)
+        {
             LOGGER.error("Encountered an unexpected exception", throwable1);
             CrashReport crashreport;
-            if (throwable1 instanceof ReportedException) {
-                crashreport = this.addServerInfoToCrashReport(((ReportedException)throwable1).getCrashReport());
-            } else {
-                crashreport = this.addServerInfoToCrashReport(new CrashReport("Exception in server tick loop", throwable1));
+            if (throwable1 instanceof ReportedException)
+            {
+                crashreport = addServerInfoToCrashReport(((ReportedException) throwable1).getCrashReport());
+            }
+            else
+            {
+                crashreport = addServerInfoToCrashReport(new CrashReport("Exception in server tick loop", throwable1));
             }
 
             File file1 = new File(new File(this.getDataDirectory(), "crash-reports"), "crash-" + (new SimpleDateFormat("yyyy-MM-dd_HH.mm.ss")).format(new Date()) + "-server.txt");
-            if (crashreport.saveToFile(file1)) {
-                LOGGER.error("This crash report has been saved to: {}", file1.getAbsolutePath());
-            } else {
-                LOGGER.error("We were unable to save this crash report to disk.");
+            if (crashreport.saveToFile(file1))
+            {
+                LOGGER.log(UNIT_TEST, "This crash report has been saved to: {}", file1.getAbsolutePath());
+            }
+            else
+            {
+                LOGGER.log(UNIT_TEST, "We were unable to save this crash report to disk.");
             }
 
-            net.minecraftforge.fml.server.ServerLifecycleHooks.expectServerStopped(); // has to come before finalTick to avoid race conditions
-            this.finalTick(crashreport);
-        } finally {
-            try {
-                this.stopServer();
-            } catch (Throwable throwable) {
-                LOGGER.error("Exception stopping the server", throwable);
-            } finally {
-                net.minecraftforge.fml.server.ServerLifecycleHooks.handleServerStopped(this);
-                this.systemExitNow();
+            ServerLifecycleHooks.expectServerStopped(); // has to come before finalTick to avoid race conditions
+            finalTick(crashreport);
+        }
+        finally
+        {
+            try
+            {
+                stopServer();
+            }
+            catch (Throwable throwable)
+            {
+                LOGGER.log(UNIT_TEST, "Exception stopping the server", throwable);
+            }
+            finally
+            {
+                ServerLifecycleHooks.handleServerStopped(this);
+                systemExitNow();
             }
         }
     }
@@ -182,6 +214,6 @@ public class DedicatedTestServer extends DedicatedServer
     @Override
     protected void finalTick(@Nullable CrashReport report)
     {
-        // Noop
+        // Noop, overriden to add @Nullable
     }
 }

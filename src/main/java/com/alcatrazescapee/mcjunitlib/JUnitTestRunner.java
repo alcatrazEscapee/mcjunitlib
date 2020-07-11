@@ -78,15 +78,15 @@ public class JUnitTestRunner implements TestExecutionListener
             LOGGER.log(UNIT_TEST, " - {} / {} Passed ({})", summary.getTestsSucceededCount(), summary.getTestsFoundCount(), String.format("%02d%%", (int) (100f * summary.getTestsSucceededCount() / summary.getTestsFoundCount())));
             if (summary.getTestsFailedCount() > 0)
             {
-                LOGGER.log(UNIT_TEST, " - {} / {} Failed ({}%)", summary.getTestsFailedCount(), summary.getTestsFoundCount(), String.format("%02d%%", (int) (100f * summary.getTestsFailedCount() / summary.getTestsFoundCount())));
+                LOGGER.log(UNIT_TEST, " - {} / {} Failed ({})", summary.getTestsFailedCount(), summary.getTestsFoundCount(), String.format("%02d%%", (int) (100f * summary.getTestsFailedCount() / summary.getTestsFoundCount())));
             }
             if (summary.getTestsSkippedCount() > 0)
             {
-                LOGGER.log(UNIT_TEST, " - {} / {} Skipped ({}%)", summary.getTestsSkippedCount(), summary.getTestsFoundCount(), String.format("%02d%%", (int) (100f * summary.getTestsSkippedCount() / summary.getTestsFoundCount())));
+                LOGGER.log(UNIT_TEST, " - {} / {} Skipped ({})", summary.getTestsSkippedCount(), summary.getTestsFoundCount(), String.format("%02d%%", (int) (100f * summary.getTestsSkippedCount() / summary.getTestsFoundCount())));
             }
             if (summary.getTestsAbortedCount() > 0)
             {
-                LOGGER.log(UNIT_TEST, " - {} / {} Aborted ({}%)", summary.getTestsAbortedCount(), summary.getTestsFoundCount(), String.format("%02d%%", (int) (100f * summary.getTestsAbortedCount() / summary.getTestsFoundCount())));
+                LOGGER.log(UNIT_TEST, " - {} / {} Aborted ({})", summary.getTestsAbortedCount(), summary.getTestsFoundCount(), String.format("%02d%%", (int) (100f * summary.getTestsAbortedCount() / summary.getTestsFoundCount())));
             }
             String millis = timeMillis == 0 ? "< 1" : String.valueOf(timeMillis);
             String seconds = timeMillis < 1000 ? "< 1" : String.valueOf(timeMillis / 1000);
