@@ -58,8 +58,8 @@ public class DedicatedTestServerLauncher
         }
         catch (InvocationTargetException | NoSuchMethodException | IllegalAccessException | ClassNotFoundException e)
         {
-            LOGGER.fatal("Oh noes, our hacks have failed!");
-            LOGGER.fatal("Error: ", e);
+            LOGGER.log(UNIT_TEST, "Forge is calling, they want their ArgumentList back. This is a bug!");
+            LOGGER.log(UNIT_TEST, "Error: ", e);
             return;
         }
 

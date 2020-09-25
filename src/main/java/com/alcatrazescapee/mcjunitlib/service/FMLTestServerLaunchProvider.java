@@ -33,7 +33,7 @@ public class FMLTestServerLaunchProvider extends FMLUserdevServerLaunchProvider
             super.beforeStart(launchClassLoader);
             launchClassLoader.addTargetPackageFilter(getPackagePredicate());
             Thread.currentThread().setContextClassLoader(launchClassLoader.getInstance());
-            Class.forName("com.alcatrazescapee.mcjunitlib.DedicatedTestServer", true, launchClassLoader.getInstance()).getMethod("main", String[].class).invoke(null, (Object)arguments);
+            Class.forName("com.alcatrazescapee.mcjunitlib.TestMain", true, launchClassLoader.getInstance()).getMethod("main", String[].class).invoke(null, (Object)arguments);
             return null;
         };
     }

@@ -6,7 +6,7 @@ This is a library designed to make it possible to test Minecraft Forge mods usin
 
 This assumes you already have a basic `build.gradle` mod workspace set up.
 
-First, you must add this library a test dependency. Make sure to replace `MINECRAFT_VERSION` and `VERSION` with the version you want to use (e.g. `1.15.2` and `1.0.0`):
+First, you must add this library a test dependency. Make sure to replace `MINECRAFT_VERSION` and `VERSION` with the version you want to use (see below for latest versions):
 
 ```groovy
 repositories {
@@ -20,9 +20,14 @@ dependencies {
 }
 ```
 
+The latest versions can be checked by looking at the [releases](https://github.com/alcatrazEscapee/mcjunitlib/releases) page. As of time of writing (2020-09-25), the latest versions are:
+
+- Minecraft 1.16.3: `1.1.0`
+- Minecraft 1.15.2: `1.0.1`
+
 A couple things to note:
 
-- This mod will package the JUnit 5 API as part of the mod jar. This is important - do not add a dependency on JUnit manually as Forge will only load mod classes using the transforming class loader which is required in order to access minecraft source code without everything crashing and burning
+- This mod will package the JUnit 5 API as part of the mod jar. This is important - do not add a dependency on JUnit manually as Forge will only load mod classes using the transforming class loader which is required in order to access minecraft source code without everything crashing and burning.
 - `transitive = false` is to stop extra dependencies (such as forge, or JUnit dependencies) from leaking onto the classpath as they are included in the jar itself, or should not be included as they are already present in the mod dev workspace.
 
 Then, you need to add a run configuration which is responsible for running the JUnit tests. In `minecraft`, under `runs` (where `server` and `client` typically are), add the following run configuration. Make sure to replace all references to `modid` with your mod id.
