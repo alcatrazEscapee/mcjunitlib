@@ -84,7 +84,7 @@ public class DedicatedTestServer extends DedicatedServer
         {
             try
             {
-                ObfuscationReflectionHelper.setPrivateValue(MinecraftServer.class, this, true, "field_71316_v ");
+                ObfuscationReflectionHelper.setPrivateValue(MinecraftServer.class, this, true, "field_71316_v");
                 stopServer();
             }
             catch (Throwable throwable)
@@ -97,5 +97,11 @@ public class DedicatedTestServer extends DedicatedServer
                 onServerExit();
             }
         }
+    }
+
+    @Override
+    public long getMaxTickLength()
+    {
+        return 0; // Override to prevent server watchdog thread from starting and crashing long running tests
     }
 }

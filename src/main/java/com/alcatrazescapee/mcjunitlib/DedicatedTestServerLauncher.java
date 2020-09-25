@@ -50,7 +50,6 @@ public class DedicatedTestServerLauncher
 
             // Testing specific options
             putLazy.invoke(argumentList, "launchTarget", "fmltestserver");
-            putLazy.invoke(argumentList, "nogui", null);
             putLazy.invoke(argumentList, "world", "test-world");
 
             arguments = (String[]) getArguments.invoke(argumentList);
