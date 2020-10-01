@@ -1,6 +1,5 @@
 package com.alcatrazescapee.mcjunitlib;
 
-import java.awt.*;
 import java.io.File;
 import java.net.Proxy;
 import java.nio.file.Path;
@@ -37,7 +36,6 @@ import net.minecraft.world.storage.FolderName;
 import net.minecraft.world.storage.IServerConfiguration;
 import net.minecraft.world.storage.SaveFormat;
 import net.minecraft.world.storage.ServerWorldInfo;
-
 import net.minecraftforge.fml.server.ServerModLoader;
 
 import com.mojang.authlib.GameProfileRepository;
@@ -58,8 +56,22 @@ public class TestMain
         LOGGER.log(UNIT_TEST, "TestMain launching");
 
         OptionParser optionparser = new OptionParser();
+
+        // Consume unused options, so they don't error if used inadvertently
+        optionparser.accepts("nogui");
+        optionparser.accepts("initSettings", "Initializes 'server.properties' and 'eula.txt', then quits");
+        optionparser.accepts("demo");
+        optionparser.accepts("bonusChest");
+        optionparser.accepts("forceUpgrade");
+        optionparser.accepts("eraseCache");
+        optionparser.accepts("safeMode", "Loads level with vanilla datapack only");
+        optionparser.accepts("help").forHelp();
+        optionparser.accepts("singleplayer").withRequiredArg();
         OptionSpec<String> universeOption = optionparser.accepts("universe").withRequiredArg().defaultsTo(".");
         OptionSpec<String> worldOption = optionparser.accepts("world").withRequiredArg();
+        optionparser.accepts("port").withRequiredArg().ofType(Integer.class).defaultsTo(-1);
+        optionparser.accepts("serverId").withRequiredArg();
+        optionparser.nonOptions();
         optionparser.accepts("allowUpdates").withRequiredArg().ofType(Boolean.class).defaultsTo(Boolean.TRUE); // Forge: allow mod updates to proceed
         optionparser.accepts("gameDir").withRequiredArg().ofType(File.class).defaultsTo(new File(".")); //Forge: Consume this argument, we use it in the launcher, and the client side.
 
