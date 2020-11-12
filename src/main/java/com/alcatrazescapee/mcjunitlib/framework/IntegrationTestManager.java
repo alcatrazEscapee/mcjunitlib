@@ -104,6 +104,7 @@ public enum IntegrationTestManager
     private final List<IntegrationTestHelper> activeTests;
 
     private int passedTests, failedTests;
+    private int currentTick;
     private Status status;
 
     IntegrationTestManager()
@@ -126,7 +127,7 @@ public enum IntegrationTestManager
             {
                 if (manager.get(test.getTemplateName()) == null)
                 {
-                    source.sendFailure(new StringTextComponent("Test '").append(test.getFullName()).append("' failed verification: No template '").append(test.getTemplateName().toString()).append("' found"));
+                    source.sendFailure(new StringTextComponent("Test '").append(test.getName()).append("' failed verification: No template '").append(test.getTemplateName().toString()).append("' found"));
                     allPassed = false;
                 }
             }
@@ -205,9 +206,9 @@ public enum IntegrationTestManager
 
                     // Add the lectern with log book
                     world.setBlockAndUpdate(mutablePos.setWithOffset(testBoxOrigin, -1, 1, -1), Blocks.LECTERN.defaultBlockState());
-                    ItemStack book = new ItemStack(Items.WRITABLE_BOOK, 1);
-                    editLogBook(book, test.getFullName(), "Setup", Collections.emptyList());
-                    LecternBlock.tryPlaceBook(world, mutablePos, world.getBlockState(mutablePos), new ItemStack(Items.WRITABLE_BOOK));
+                    ItemStack book = new ItemStack(Items.WRITABLE_BOOK);
+                    editLogBook(book, test.getName(), "Setup", Collections.emptyList());
+                    LecternBlock.tryPlaceBook(world, mutablePos, world.getBlockState(mutablePos), book);
 
                     // Build the test itself
                     template.placeInWorld(world, testTemplateOrigin, settings, random);
@@ -245,7 +246,7 @@ public enum IntegrationTestManager
                 TileEntity te = world.getBlockEntity(activeTest.getOrigin().offset(-2, 0, -2));
                 if (te instanceof LecternTileEntity)
                 {
-                    editLogBook(((LecternTileEntity) te).getBook(), activeTest.getTest().getFullName(), "Running", Collections.emptyList());
+                    editLogBook(((LecternTileEntity) te).getBook(), activeTest.getTest().getName(), "Running", Collections.emptyList());
                 }
             }
             status = Status.RUNNING;
@@ -258,11 +259,12 @@ public enum IntegrationTestManager
     {
         if (!activeTests.isEmpty() && status == Status.RUNNING)
         {
+            currentTick++;
             Iterator<IntegrationTestHelper> iterator = activeTests.iterator();
             while (iterator.hasNext())
             {
                 IntegrationTestHelper helper = iterator.next();
-                helper.tick().ifPresent(result -> {
+                helper.tick(currentTick).ifPresent(result -> {
                     BlockState glass;
                     if (result.isSuccess())
                     {
@@ -277,7 +279,7 @@ public enum IntegrationTestManager
                         // Send failure messages!
                         if (!result.getErrors().isEmpty())
                         {
-                            LOGGER.error("Test Failed {}", helper.getTest().getFullName());
+                            LOGGER.error("Test Failed {}", helper.getTest().getName());
                             for (String error : result.getErrors())
                             {
                                 LOGGER.error(error);
@@ -293,7 +295,7 @@ public enum IntegrationTestManager
                     if (te instanceof LecternTileEntity && ((LecternTileEntity) te).hasBook())
                     {
                         String status = result.isSuccess() ? "Pass" : "Fail";
-                        editLogBook(((LecternTileEntity) te).getBook(), helper.getTest().getFullName(), status, result.getErrors());
+                        editLogBook(((LecternTileEntity) te).getBook(), helper.getTest().getName(), status, result.getErrors());
                     }
 
                     iterator.remove();
@@ -322,13 +324,13 @@ public enum IntegrationTestManager
     {
         CompoundNBT bookNbt = new CompoundNBT();
         ListNBT pagesNbt = new ListNBT();
-        StringBuilder builder = new StringBuilder().append("Test: ").append(testName).append("\nStatus: ").append(status);
+        StringBuilder builder = new StringBuilder().append("Test:\n").append(testName).append("\nStatus: ").append(status);
         if (!errors.isEmpty())
         {
-            builder.append("\nErrors: ");
+            builder.append("\nErrors:");
             for (String error : errors)
             {
-                builder.append(error);
+                builder.append('\n').append(error);
             }
         }
         while (builder.length() > 250)

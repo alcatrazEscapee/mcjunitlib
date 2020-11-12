@@ -36,9 +36,9 @@ class IntegrationTestRunner
 
     }
 
-    String getFullName()
+    String getName()
     {
-        return clazz.getName() + "." + method.getName() + "()";
+        return clazz.getSimpleName() + "." + method.getName() + "()";
     }
 
     ResourceLocation getTemplateName()
@@ -69,7 +69,7 @@ class IntegrationTestRunner
         }
         catch (IllegalAccessException | InvocationTargetException e)
         {
-            LOGGER.warn("Unable to resolve integration test at {} (Cannot Invoke Method - {})", getFullName(), e.getMessage());
+            LOGGER.warn("Unable to resolve integration test at {} (Cannot Invoke Method - {})", getName(), e.getMessage());
             LOGGER.debug("Error", e);
             helper.fail("Reflection Error: " + e.getMessage());
         }

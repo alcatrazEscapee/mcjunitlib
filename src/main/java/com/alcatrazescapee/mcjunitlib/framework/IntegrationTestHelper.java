@@ -1,6 +1,7 @@
 package com.alcatrazescapee.mcjunitlib.framework;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.BooleanSupplier;
@@ -31,9 +32,9 @@ public class IntegrationTestHelper
     private final MutableBoundingBox boundingBox;
 
     private final List<Supplier<String>> assertions;
+    private final List<ScheduledAction> scheduledActions;
 
     private boolean failFast; // If conditions will never be set to true
-    private int currentTick;
 
     public IntegrationTestHelper(ServerWorld world, IntegrationTestRunner test, BlockPos origin, BlockPos size)
     {
@@ -43,7 +44,8 @@ public class IntegrationTestHelper
         this.boundingBox = new MutableBoundingBox(BlockPos.ZERO, size.offset(1, 1, 1));
 
         this.assertions = new ArrayList<>();
-        this.currentTick = 0;
+        this.scheduledActions = new ArrayList<>();
+        this.failFast = false;
     }
 
     public void destroyBlock(BlockPos pos)
@@ -81,6 +83,15 @@ public class IntegrationTestHelper
                 ((LeverBlock) state.getBlock()).pull(state, world, actualPos);
             }
         });
+    }
+
+    public void runAfterTicks(int ticks, Runnable action)
+    {
+        if (ticks >= test.getTimeoutTicks())
+        {
+            fail("Action set to execute after " + ticks + " ticks but this test will time out at " + test.getTimeoutTicks() + " ticks");
+            scheduledActions.add(new ScheduledAction(ticks, action));
+        }
     }
 
     public BlockState getBlockState(BlockPos pos)
@@ -246,9 +257,19 @@ public class IntegrationTestHelper
         return world;
     }
 
-    Optional<TestResult> tick()
+    Optional<TestResult> tick(int currentTick)
     {
-        currentTick++;
+        // Execute scheduled actions
+        Iterator<ScheduledAction> iterator = scheduledActions.iterator();
+        while (iterator.hasNext())
+        {
+            ScheduledAction action = iterator.next();
+            if (action.ticks == currentTick)
+            {
+                action.action.run();
+                iterator.remove();
+            }
+        }
         if (currentTick % test.getRefreshTicks() == 0)
         {
             // Refresh conditions
@@ -275,7 +296,7 @@ public class IntegrationTestHelper
             if (test.getTimeoutTicks() != -1 && currentTick >= test.getTimeoutTicks())
             {
                 // Test failed due to time out
-                failures.add(test.getFullName() + " Failed after time out at " + test.getTimeoutTicks() + " ticks.");
+                failures.add(test.getName() + " Failed after time out at " + test.getTimeoutTicks() + " ticks.");
                 return TestResult.fail(failures);
             }
         }
@@ -290,5 +311,17 @@ public class IntegrationTestHelper
     IntegrationTestRunner getTest()
     {
         return test;
+    }
+
+    static final class ScheduledAction
+    {
+        final int ticks;
+        private final Runnable action;
+
+        ScheduledAction(int ticks, Runnable action)
+        {
+            this.ticks = ticks;
+            this.action = action;
+        }
     }
 }

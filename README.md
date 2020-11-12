@@ -18,15 +18,13 @@ repositories {
 }
 
 dependencies {
-    testImplementation fg.deobf('com.github.alcatrazEscapee:mcjunitlib:VERSION-MINECRAFT_VERSION') {
-        transitive = false
-    }
+    testImplementation fg.deobf('com.github.alcatrazEscapee:mcjunitlib:VERSION-MINECRAFT_VERSION')
 }
 ```
 
 The latest versions can be checked by looking at the [releases](https://github.com/alcatrazEscapee/mcjunitlib/releases) page. As of time of writing (2020-11-07), the latest versions are:
 
-- Minecraft 1.16.4: `1.2.0`
+- Minecraft 1.16.4: `1.3.0`
 - Minecraft 1.15.2: `1.0.1`
 
 A couple things to note:
@@ -142,10 +140,11 @@ Integration tests are slightly more complex to construct, but the results are mu
 2) Save the structure, using the vanilla structure block. Once it is saved, move the generated `.nbt` file to your mod `src/test/resources` sources.
 3) Write a test class and method. Each method must match up exactly with a structure file.
 4) Add an entry point for the integration test infrastructure into your test sources (`src/main/test`) - more on this later.
-5) Create a new world, using the default superflat settings. (Recommended: turn off mob spawning and daylight cycle before world creation.), with cheats enabled.
-6) Run `/tp 0 ~ 0` to teleport yourself to the test location.
+5) Create a new world, using the default superflat settings. mcjunitlib will set a few game rules for a smooth testing experience and you will spawn right next to the test area.
 7) Run `/integrationTests setup`. This will build all integration tests.
 8) Run `/integrationTests run`. This will run all integration tests. Success will result in green beacon beams. Failures will result in red beacon beams and errors emitted to the log.
+
+You can re-run `setup` and `run` as many times as nessecary, provided they execute in that order. While tests are running, they will be indicated by a gray beacon beam. Only once tests have all finished (all beacon beams are red or green) can you run the tests again.
 
 A sample test class might look like this:
 
