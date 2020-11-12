@@ -29,10 +29,7 @@ The latest versions can be checked by looking at the [releases](https://github.c
 - Minecraft 1.16.4: `1.3.0`
 - Minecraft 1.15.2: `1.0.1`
 
-A couple things to note:
-
-- This mod will package the JUnit 5 API as part of the mod jar. This is important - do not add a dependency on JUnit manually as Forge will only load mod classes using the transforming class loader which is required in order to access minecraft source code without everything crashing and burning.
-- `transitive = false` is to stop extra dependencies (such as forge, or JUnit dependencies) from leaking onto the classpath as they are included in the jar itself, or should not be included as they are already present in the mod dev workspace.
+Note: This mod will package the JUnit 5 API as part of the mod jar. This is important - do not add a dependency on JUnit manually as Forge will only load mod classes using the transforming class loader which is required in order to access minecraft source code without everything crashing and burning.
 
 Then, for [Unit Tests](#unit-tests), the following run configuration is required.
 
