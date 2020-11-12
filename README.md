@@ -6,6 +6,8 @@ This is a library which attempt to make Minecraft Forge mods extensively, comple
 
 2) **Integration Testing**. This was heavily inspired by a video on [Minecraft's Testing System](https://www.youtube.com/watch?v=vXaWOJTCYNg&feature=youtu.be). And it is essentially a recreation of the core philosophy: Tests are represented as a pair of a structure (saved using a structure block), and a test method. The method is able to declare actions (e.g. place blocks, pull levers) to initiate the test, and use a wide range of assertions (assert blocks, fluids, tile entities meet conditions) in order to characterize test success.
 
+If you experience any issues using this library, or have a suggestion for how it could be improved, please submit an issue, and I will try to address any concerns raised. Happy testing! :)
+
 ## Usage
 
 This assumes you already have a basic Minecraft Forge mod dev `build.gradle` mod workspace set up.
@@ -22,7 +24,7 @@ dependencies {
 }
 ```
 
-The latest versions can be checked by looking at the [releases](https://github.com/alcatrazEscapee/mcjunitlib/releases) page. As of time of writing (2020-11-07), the latest versions are:
+The latest versions can be checked by looking at the [releases](https://github.com/alcatrazEscapee/mcjunitlib/releases) page. As of time of writing (2020-11-12), the latest versions are:
 
 - Minecraft 1.16.4: `1.3.0`
 - Minecraft 1.15.2: `1.0.1`
@@ -140,11 +142,11 @@ Integration tests are slightly more complex to construct, but the results are mu
 2) Save the structure, using the vanilla structure block. Once it is saved, move the generated `.nbt` file to your mod `src/test/resources` sources.
 3) Write a test class and method. Each method must match up exactly with a structure file.
 4) Add an entry point for the integration test infrastructure into your test sources (`src/main/test`) - more on this later.
-5) Create a new world, using the default superflat settings. mcjunitlib will set a few game rules for a smooth testing experience and you will spawn right next to the test area.
+5) Create a new world, with the world type "Superflat", Disable Structures, Creative, and Cheats Enabled.
 7) Run `/integrationTests setup`. This will build all integration tests.
 8) Run `/integrationTests run`. This will run all integration tests. Success will result in green beacon beams. Failures will result in red beacon beams and errors emitted to the log.
 
-You can re-run `setup` and `run` as many times as nessecary, provided they execute in that order. While tests are running, they will be indicated by a gray beacon beam. Only once tests have all finished (all beacon beams are red or green) can you run the tests again.
+You can re-run `setup` and `run` as many times as necessary, provided they execute in that order. While tests are running, they will be indicated by a gray beacon beam. Only once tests have all finished (all beacon beams are red or green) can you run the tests again.
 
 A sample test class might look like this:
 
@@ -179,10 +181,10 @@ There are a few important things to note here:
 - Test methods MUST be annotated with `@IntegrationTest`.
 - Test methods MUST have one parameter, of type `IntegrationTestHelper`. This is used to interact with the world directly, and characterize success and failure of the test via various `assert[Thing]` methods.
 
-Finally, in order for integration tests to work at all, it needs to be initialized by mod code. You will need to add the following class (or something functionally equivalent) into your test sources.
+Finally, in order for integration tests to work at all, it needs to be initialized by mod code. You will need to add the following class (or something functionally equivalent) into your test sources. This will trigger mcjunitlib to register commands, edit the spawn location, and locate test classes and methods.
 
 ```java
-package myModTests;
+package example;
 
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -200,5 +202,3 @@ public class IntegrationTestEntryPoint
     }
 }
 ```
-
-Note: Pending certain Forge PRs, I would like to streamline the world creation process to be optimal for a testing setup (This would simplify steps 5-7 in the above list).
