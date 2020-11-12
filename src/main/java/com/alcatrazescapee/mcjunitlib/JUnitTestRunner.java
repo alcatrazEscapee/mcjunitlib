@@ -32,7 +32,7 @@ import org.junit.platform.launcher.listeners.TestExecutionSummary;
 public class JUnitTestRunner implements TestExecutionListener
 {
     private static final Level UNIT_TEST = Level.forName("UNITTEST", 50);
-    private static final Logger LOGGER = LogManager.getLogger("mcjunitlib");
+    private static final Logger LOGGER = LogManager.getLogger("UnitTests");
     private static final String HR = "--------------------------------------------------";
 
     public void runAllTests()
