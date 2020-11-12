@@ -1,7 +1,6 @@
 package com.alcatrazescapee.mcjunitlib.framework;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.BooleanSupplier;
@@ -33,6 +32,7 @@ public class IntegrationTestHelper
 
     private final List<Supplier<String>> assertions;
 
+    private boolean failFast; // If conditions will never be set to true
     private int currentTick;
 
     public IntegrationTestHelper(ServerWorld world, IntegrationTestRunner test, BlockPos origin, BlockPos size)
@@ -212,6 +212,7 @@ public class IntegrationTestHelper
     public void fail(String message)
     {
         assertions.add(() -> message);
+        failFast = true;
     }
 
     /**
@@ -264,13 +265,18 @@ public class IntegrationTestHelper
             if (failures.isEmpty())
             {
                 // Test passed!
-                return Optional.of(new TestResult(Collections.emptyList(), true));
+                return TestResult.success();
+            }
+            if (failFast)
+            {
+                // Fail fast
+                return TestResult.fail(failures);
             }
             if (test.getTimeoutTicks() != -1 && currentTick >= test.getTimeoutTicks())
             {
                 // Test failed due to time out
                 failures.add(test.getFullName() + " Failed after time out at " + test.getTimeoutTicks() + " ticks.");
-                return Optional.of(new TestResult(failures, false));
+                return TestResult.fail(failures);
             }
         }
         return Optional.empty();

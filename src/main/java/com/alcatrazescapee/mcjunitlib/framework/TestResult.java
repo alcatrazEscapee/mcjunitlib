@@ -1,15 +1,37 @@
 package com.alcatrazescapee.mcjunitlib.framework;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
-final class TestResult
+class TestResult
 {
-    final List<String> errors;
-    final boolean pass;
+    static Optional<TestResult> success()
+    {
+        return Optional.of(new TestResult(Collections.emptyList(), true));
+    }
 
-    TestResult(List<String> errors, boolean pass)
+    static Optional<TestResult> fail(List<String> errors)
+    {
+        return Optional.of(new TestResult(errors, false));
+    }
+
+    private final List<String> errors;
+    private final boolean success;
+
+    TestResult(List<String> errors, boolean success)
     {
         this.errors = errors;
-        this.pass = pass;
+        this.success = success;
+    }
+
+    boolean isSuccess()
+    {
+        return success;
+    }
+
+    List<String> getErrors()
+    {
+        return errors;
     }
 }

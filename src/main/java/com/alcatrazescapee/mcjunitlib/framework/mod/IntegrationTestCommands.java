@@ -28,7 +28,7 @@ final class IntegrationTestCommands
 
     private static int runAllTests(CommandSource source)
     {
-        if (IntegrationTestManager.INSTANCE.runAllTests())
+        if (IntegrationTestManager.INSTANCE.runAllTests(source.getLevel()))
         {
             source.sendSuccess(new StringTextComponent("Running!"), true);
         }
@@ -44,7 +44,6 @@ final class IntegrationTestCommands
         if (IntegrationTestManager.INSTANCE.verifyAllTests(source.getLevel(), source))
         {
             IntegrationTestManager.INSTANCE.setupAllTests(source.getLevel(), source);
-            source.sendSuccess(new StringTextComponent("Setup Finished!"), true);
         }
         else
         {

@@ -9,7 +9,15 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
+import net.minecraft.block.LecternBlock;
 import net.minecraft.command.CommandSource;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
+import net.minecraft.nbt.CompoundNBT;
+import net.minecraft.nbt.ListNBT;
+import net.minecraft.nbt.StringNBT;
+import net.minecraft.tileentity.LecternTileEntity;
+import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.Direction;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.StringTextComponent;
@@ -62,25 +70,30 @@ public enum IntegrationTestManager
     {
         final String targetClass = annotation.getClassType().getClassName();
         final String targetName = annotation.getMemberName();
+        final String targetDescriptor = "(Lcom/alcatrazescapee/mcjunitlib/framework/IntegrationTestHelper;)V";
+
+        if (!targetName.endsWith(targetDescriptor))
+        {
+            LOGGER.error("Unable to resolve integration test at {}.{} (Invalid Method Signature - Must take a parameter of type IntegrationTestHelper and return void)", targetClass, targetName);
+            return null;
+        }
+
+        final String targetMethodName = targetName.substring(0, targetName.length() - targetDescriptor.length());
 
         try
         {
-            Class<?> clazz = Class.forName(targetClass);
-            for (Method method : clazz.getDeclaredMethods())
-            {
-                if (targetName.equals(method.getName() + Type.getMethodDescriptor(method)))
-                {
-                    method.setAccessible(true);
-                    Object instance = ((method.getModifiers() & Modifier.STATIC) == Modifier.STATIC) ? null : clazz.newInstance();
-                    IntegrationTest typedAnnotation = method.getDeclaredAnnotation(IntegrationTest.class);
-                    return new IntegrationTestRunner(modId, clazz, method, typedAnnotation, instance);
-                }
-            }
-            LOGGER.warn("Unable to resolve integration test at {}.{} (Method Not Found)", targetClass, targetName);
+            final Class<?> clazz = Class.forName(targetClass);
+            final Method method = clazz.getDeclaredMethod(targetMethodName, IntegrationTestHelper.class);
+
+            method.setAccessible(true);
+
+            final Object instance = ((method.getModifiers() & Modifier.STATIC) == Modifier.STATIC) ? null : clazz.newInstance();
+            final IntegrationTest typedAnnotation = method.getDeclaredAnnotation(IntegrationTest.class);
+            return new IntegrationTestRunner(modId, clazz, method, typedAnnotation, instance);
         }
-        catch (ClassNotFoundException | InstantiationException | IllegalAccessException e)
+        catch (ClassNotFoundException | NoSuchMethodException | InstantiationException | IllegalAccessException e)
         {
-            LOGGER.warn("Unable to resolve integration test at {}.{} (Unknown Exception - {})", targetClass, targetName, e.getMessage());
+            LOGGER.error("Unable to resolve integration test at {}.{} (Unknown Exception - {})", targetClass, targetName, e.getMessage());
             LOGGER.debug("Error", e);
         }
         return null;
@@ -125,7 +138,7 @@ public enum IntegrationTestManager
 
     public boolean setupAllTests(ServerWorld world, CommandSource source)
     {
-        if (status == Status.VERIFIED || status == Status.FINISHED)
+        if (status == Status.VERIFIED || status == Status.FINISHED || status == Status.SETUP)
         {
             status = Status.SETUP;
 
@@ -151,13 +164,14 @@ public enum IntegrationTestManager
                     final BlockPos testBoxOrigin = cursor.immutable();
                     final BlockPos testTemplateOrigin = testBoxOrigin.offset(1, 1, 1);
 
-                    // Build a floor beneath the test
+                    // Clear the test area
                     for (int x = testBoxOrigin.getX(); x <= testBoxOrigin.getX() + size.getX() + 1; x++)
                     {
                         for (int z = testBoxOrigin.getZ(); z <= testBoxOrigin.getZ() + size.getZ() + 1; z++)
                         {
                             mutablePos.set(x, testFloorY, z);
 
+                            // Build a floor with a fancy construction-tape border
                             if (x == testBoxOrigin.getX() || x == testBoxOrigin.getX() + size.getX() + 1 || z == testBoxOrigin.getZ() || z == testBoxOrigin.getZ() + size.getZ() + 1)
                             {
                                 // Border
@@ -166,6 +180,13 @@ public enum IntegrationTestManager
                             else
                             {
                                 world.setBlockAndUpdate(mutablePos, Blocks.GRAY_CONCRETE.defaultBlockState());
+                            }
+
+                            // Clear the area of the test
+                            for (int y = testTemplateOrigin.getY(); y <= testTemplateOrigin.getY() + size.getY() + 1; y++)
+                            {
+                                mutablePos.set(x, y, z);
+                                world.setBlockAndUpdate(mutablePos, Blocks.AIR.defaultBlockState());
                             }
                         }
                     }
@@ -181,6 +202,12 @@ public enum IntegrationTestManager
                     }
                     world.setBlockAndUpdate(mutablePos.setWithOffset(testBoxOrigin, Direction.DOWN), Blocks.BEACON.defaultBlockState());
                     world.setBlockAndUpdate(mutablePos.set(testBoxOrigin), Blocks.LIGHT_GRAY_STAINED_GLASS.defaultBlockState());
+
+                    // Add the lectern with log book
+                    world.setBlockAndUpdate(mutablePos.setWithOffset(testBoxOrigin, -1, 1, -1), Blocks.LECTERN.defaultBlockState());
+                    ItemStack book = new ItemStack(Items.WRITABLE_BOOK, 1);
+                    editLogBook(book, test.getFullName(), "Setup", Collections.emptyList());
+                    LecternBlock.tryPlaceBook(world, mutablePos, world.getBlockState(mutablePos), new ItemStack(Items.WRITABLE_BOOK));
 
                     // Build the test itself
                     template.placeInWorld(world, testTemplateOrigin, settings, random);
@@ -198,18 +225,28 @@ public enum IntegrationTestManager
                 cursor.setX(0);
                 cursor.move(Direction.SOUTH, maxZSize + 2 + 3); // +z
             }
+
+            source.sendSuccess(new StringTextComponent("Setup Finished!"), true);
             return true;
         }
         return false;
     }
 
-    public boolean runAllTests()
+    public boolean runAllTests(ServerWorld world)
     {
         if (status == Status.SETUP)
         {
             for (IntegrationTestHelper activeTest : activeTests)
             {
+                // Run tests and setup conditions
                 activeTest.getTest().run(activeTest);
+
+                // Update the log book
+                TileEntity te = world.getBlockEntity(activeTest.getOrigin().offset(-2, 0, -2));
+                if (te instanceof LecternTileEntity)
+                {
+                    editLogBook(((LecternTileEntity) te).getBook(), activeTest.getTest().getFullName(), "Running", Collections.emptyList());
+                }
             }
             status = Status.RUNNING;
             return true;
@@ -227,7 +264,7 @@ public enum IntegrationTestManager
                 IntegrationTestHelper helper = iterator.next();
                 helper.tick().ifPresent(result -> {
                     BlockState glass;
-                    if (result.pass)
+                    if (result.isSuccess())
                     {
                         glass = Blocks.GREEN_STAINED_GLASS.defaultBlockState();
                         passedTests++;
@@ -238,18 +275,27 @@ public enum IntegrationTestManager
                         failedTests++;
 
                         // Send failure messages!
-                        if (!result.errors.isEmpty())
+                        if (!result.getErrors().isEmpty())
                         {
                             LOGGER.error("Test Failed {}", helper.getTest().getFullName());
-                            for (String error : result.errors)
+                            for (String error : result.getErrors())
                             {
-                                LOGGER.warn(error);
+                                LOGGER.error(error);
                             }
                         }
                     }
 
                     // Update the beacon state
                     world.setBlockAndUpdate(helper.getOrigin().offset(-1, -1, -1), glass);
+
+                    // Update the log book
+                    TileEntity te = world.getBlockEntity(helper.getOrigin().offset(-2, 0, -2));
+                    if (te instanceof LecternTileEntity && ((LecternTileEntity) te).hasBook())
+                    {
+                        String status = result.isSuccess() ? "Pass" : "Fail";
+                        editLogBook(((LecternTileEntity) te).getBook(), helper.getTest().getFullName(), status, result.getErrors());
+                    }
+
                     iterator.remove();
                 });
             }
@@ -270,6 +316,29 @@ public enum IntegrationTestManager
     {
         allTests.add(test);
         sortedTests.computeIfAbsent(test.getClassName(), key -> new ArrayList<>()).add(test);
+    }
+
+    private void editLogBook(ItemStack stack, String testName, String status, List<String> errors)
+    {
+        CompoundNBT bookNbt = new CompoundNBT();
+        ListNBT pagesNbt = new ListNBT();
+        StringBuilder builder = new StringBuilder().append("Test: ").append(testName).append("\nStatus: ").append(status);
+        if (!errors.isEmpty())
+        {
+            builder.append("\nErrors: ");
+            for (String error : errors)
+            {
+                builder.append(error);
+            }
+        }
+        while (builder.length() > 250)
+        {
+            pagesNbt.add(StringNBT.valueOf(builder.substring(0, 250) + "..."));
+            builder.delete(0, 250);
+        }
+        pagesNbt.add(StringNBT.valueOf(builder.toString()));
+        bookNbt.put("pages", pagesNbt);
+        stack.setTag(bookNbt);
     }
 
     private enum Status
