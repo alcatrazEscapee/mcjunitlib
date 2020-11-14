@@ -1,8 +1,10 @@
 package com.alcatrazescapee.mcjunitlib.framework;
 
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.*;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 
 import org.apache.logging.log4j.LogManager;
@@ -19,6 +21,7 @@ import net.minecraft.nbt.StringNBT;
 import net.minecraft.tileentity.LecternTileEntity;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.Direction;
+import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.StringTextComponent;
 import net.minecraft.world.gen.feature.template.PlacementSettings;
@@ -43,6 +46,8 @@ public enum IntegrationTestManager
     INSTANCE;
 
     private static final Type INTEGRATION_TEST = Type.getType(IntegrationTest.class);
+    private static final Type INTEGRATION_TEST_FACTORY = Type.getType(IntegrationTestFactory.class);
+
     private static final Logger LOGGER = LogManager.getLogger("IntegrationTests");
 
     /**
@@ -57,12 +62,27 @@ public enum IntegrationTestManager
         ModList.get().getAllScanData().stream()
             .map(ModFileScanData::getAnnotations)
             .flatMap(Collection::stream)
-            .filter(a -> a.getAnnotationType().equals(INTEGRATION_TEST))
-            .map(annotation -> createIntegrationTest(modId, annotation))
-            .filter(Objects::nonNull)
+            .flatMap(annotation -> createIntegrationTests(modId, annotation))
             .forEach(IntegrationTestManager.INSTANCE::add);
 
         MinecraftForge.EVENT_BUS.register(new ForgeEventHandler());
+    }
+
+    private static Stream<IntegrationTestRunner> createIntegrationTests(String modId, ModFileScanData.AnnotationData annotation)
+    {
+        if (annotation.getAnnotationType().equals(INTEGRATION_TEST))
+        {
+            final IntegrationTestRunner test = createIntegrationTest(modId, annotation);
+            if (test != null)
+            {
+                return Stream.of(test);
+            }
+        }
+        else if (annotation.getAnnotationType().equals(INTEGRATION_TEST_FACTORY))
+        {
+            return createIntegrationTestStream(modId, annotation);
+        }
+        return Stream.empty();
     }
 
     @Nullable
@@ -89,7 +109,23 @@ public enum IntegrationTestManager
 
             final Object instance = ((method.getModifiers() & Modifier.STATIC) == Modifier.STATIC) ? null : clazz.newInstance();
             final IntegrationTest typedAnnotation = method.getDeclaredAnnotation(IntegrationTest.class);
-            return new IntegrationTestRunner(modId, clazz, method, typedAnnotation, instance);
+            final String className = testClassName(clazz);
+            final String testName = testMethodName(typedAnnotation.value(), method.getName());
+            final String testMethodName = clazz.getSimpleName() + '.' + method.getName();
+            final ResourceLocation templateName = new ResourceLocation(modId, (className + '/' + testName).toLowerCase());
+
+            return new IntegrationTestRunner(clazz, helper -> {
+                try
+                {
+                    method.invoke(instance, helper);
+                }
+                catch (IllegalAccessException | InvocationTargetException e)
+                {
+                    LOGGER.warn("Unable to resolve integration test at {} (Cannot Invoke Method - {})", testName, e.getMessage());
+                    LOGGER.debug("Error", e);
+                    helper.fail("Reflection Error: " + e.getMessage());
+                }
+            }, testMethodName, templateName, typedAnnotation.refreshTicks(), typedAnnotation.timeoutTicks());
         }
         catch (ClassNotFoundException | NoSuchMethodException | InstantiationException | IllegalAccessException e)
         {
@@ -97,6 +133,77 @@ public enum IntegrationTestManager
             LOGGER.debug("Error", e);
         }
         return null;
+    }
+
+    private static Stream<IntegrationTestRunner> createIntegrationTestStream(String modId, ModFileScanData.AnnotationData annotation)
+    {
+        final String targetClass = annotation.getClassType().getClassName();
+        final String targetName = annotation.getMemberName();
+        final String targetDescriptor = "()Ljava/util/stream/Stream;";
+
+        if (!targetName.endsWith(targetDescriptor))
+        {
+            LOGGER.error("Unable to resolve integration test at {}.{} (Invalid Method Signature - Must take no parameters and return a Stream of DynamicIntegrationTest instances)", targetClass, targetName);
+            return Stream.empty();
+        }
+
+        final String targetMethodName = targetName.substring(0, targetName.length() - targetDescriptor.length());
+
+        try
+        {
+            final Class<?> clazz = Class.forName(targetClass);
+            final Method method = clazz.getDeclaredMethod(targetMethodName);
+
+            method.setAccessible(true);
+
+            final Object instance = ((method.getModifiers() & Modifier.STATIC) == Modifier.STATIC) ? null : clazz.newInstance();
+            final IntegrationTestFactory typedAnnotation = method.getDeclaredAnnotation(IntegrationTestFactory.class);
+            final String className = testClassName(clazz);
+            final String testName = testMethodName(typedAnnotation.value(), method.getName());
+            final String testMethodName = clazz.getSimpleName() + '.' + method.getName();
+            final ResourceLocation templateName = new ResourceLocation(modId, (className + '/' + testName).toLowerCase());
+
+            try
+            {
+                return ((Stream<?>) method.invoke(instance))
+                    .map(obj -> {
+                        if (obj instanceof DynamicIntegrationTest)
+                        {
+                            final DynamicIntegrationTest dynamic = (DynamicIntegrationTest) obj;
+                            return new IntegrationTestRunner(clazz, dynamic.getTestAction(), testMethodName + '/' + dynamic.getName(), templateName, typedAnnotation.refreshTicks(), typedAnnotation.timeoutTicks());
+                        }
+                        LOGGER.error("Unable to resolve dynamic integration test at {}.{} (Stream element was not a DynamicIntegrationTest)", targetClass, targetName);
+                        return null;
+                    })
+                    .filter(Objects::nonNull);
+            }
+            catch (InvocationTargetException e)
+            {
+                LOGGER.error("Unable to resolve dynamic integration test at {}.{} (Could not invoke factory method - {})", targetClass, targetName, e.getMessage());
+                LOGGER.debug("Error", e);
+            }
+        }
+        catch (ClassNotFoundException | NoSuchMethodException | InstantiationException | IllegalAccessException e)
+        {
+            LOGGER.error("Unable to resolve dynamic integration test at {}.{} (Unknown Exception - {})", targetClass, targetName, e.getMessage());
+            LOGGER.debug("Error", e);
+        }
+        return Stream.empty();
+    }
+
+    private static String testClassName(Class<?> clazz)
+    {
+        final IntegrationTestClass annotation = clazz.getDeclaredAnnotation(IntegrationTestClass.class);
+        if (annotation != null && !"".equals(annotation.value()))
+        {
+            return annotation.value();
+        }
+        return clazz.getSimpleName();
+    }
+
+    private static String testMethodName(String value, String fallback)
+    {
+        return "".equals(value) ? fallback : value;
     }
 
     private final HashMap<String, List<IntegrationTestRunner>> sortedTests;
@@ -131,13 +238,19 @@ public enum IntegrationTestManager
                     allPassed = false;
                 }
             }
-            status = Status.VERIFIED;
-            return allPassed;
+            if (allPassed)
+            {
+                status = Status.VERIFIED;
+                source.sendSuccess(new StringTextComponent("Setup all tests!"), true);
+                return true;
+            }
+            source.sendFailure(new StringTextComponent("One or more tests failed verification!"));
+            return false;
         }
         return true;
     }
 
-    public boolean setupAllTests(ServerWorld world, CommandSource source)
+    public void setupAllTests(ServerWorld world, CommandSource source)
     {
         if (status == Status.VERIFIED || status == Status.FINISHED || status == Status.SETUP)
         {
@@ -145,6 +258,7 @@ public enum IntegrationTestManager
 
             passedTests = failedTests = 0;
             activeTests.clear();
+            currentTick = 0;
 
             int testFloorY = 3;
 
@@ -226,21 +340,20 @@ public enum IntegrationTestManager
                 cursor.setX(0);
                 cursor.move(Direction.SOUTH, maxZSize + 2 + 3); // +z
             }
-
             source.sendSuccess(new StringTextComponent("Setup Finished!"), true);
-            return true;
+            return;
         }
-        return false;
+        source.sendFailure(new StringTextComponent("Setup not possible - tests may still be running"));
     }
 
-    public boolean runAllTests(ServerWorld world)
+    public void runAllTests(ServerWorld world, CommandSource source)
     {
         if (status == Status.SETUP)
         {
             for (IntegrationTestHelper activeTest : activeTests)
             {
                 // Run tests and setup conditions
-                activeTest.getTest().run(activeTest);
+                activeTest.run();
 
                 // Update the log book
                 TileEntity te = world.getBlockEntity(activeTest.getOrigin().offset(-2, 0, -2));
@@ -250,9 +363,10 @@ public enum IntegrationTestManager
                 }
             }
             status = Status.RUNNING;
-            return true;
+            source.sendSuccess(new StringTextComponent("Running!"), true);
+            return;
         }
-        return false;
+        source.sendFailure(new StringTextComponent("Cannot run tests now! Current status = " + status.name().toLowerCase()));
     }
 
     public void tick(ServerWorld world)
@@ -333,10 +447,10 @@ public enum IntegrationTestManager
                 builder.append('\n').append(error);
             }
         }
-        while (builder.length() > 250)
+        while (builder.length() > 200)
         {
-            pagesNbt.add(StringNBT.valueOf(builder.substring(0, 250) + "..."));
-            builder.delete(0, 250);
+            pagesNbt.add(StringNBT.valueOf(builder.substring(0, 200) + "..."));
+            builder.delete(0, 200);
         }
         pagesNbt.add(StringNBT.valueOf(builder.toString()));
         bookNbt.put("pages", pagesNbt);

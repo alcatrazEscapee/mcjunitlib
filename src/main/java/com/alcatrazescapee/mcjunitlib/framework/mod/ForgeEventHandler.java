@@ -1,5 +1,7 @@
 package com.alcatrazescapee.mcjunitlib.framework.mod;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.GameRules;
@@ -18,9 +20,12 @@ import com.alcatrazescapee.mcjunitlib.framework.IntegrationTestManager;
  */
 public final class ForgeEventHandler
 {
+    private static final Logger LOGGER = LogManager.getLogger();
+
     @SubscribeEvent
     public void registerCommands(RegisterCommandsEvent event)
     {
+        LOGGER.debug("Registering 'integrationTest' command");
         IntegrationTestCommands.registerCommands(event.getDispatcher());
     }
 
@@ -38,6 +43,7 @@ public final class ForgeEventHandler
     public void onCreateWorldSpawn(WorldEvent.CreateSpawnPosition event)
     {
         // Spawn just beneath the test area
+        LOGGER.debug("Setting spawn location for integration tests");
         event.getSettings().setSpawn(new BlockPos(0, 4, -10), 0.0F);
         event.setCanceled(true);
     }
@@ -47,6 +53,8 @@ public final class ForgeEventHandler
     {
         if (event.getWorld() instanceof ServerWorld)
         {
+            LOGGER.debug("Setting up game rules for integration tests");
+
             final ServerWorld world = (ServerWorld) event.getWorld();
             final MinecraftServer server = world.getServer();
             final GameRules rules = world.getGameRules();

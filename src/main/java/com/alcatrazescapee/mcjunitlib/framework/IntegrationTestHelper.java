@@ -13,11 +13,16 @@ import net.minecraft.block.*;
 import net.minecraft.fluid.Fluid;
 import net.minecraft.fluid.FluidState;
 import net.minecraft.fluid.Fluids;
+import net.minecraft.item.*;
 import net.minecraft.tags.ITag;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.tileentity.TileEntityType;
+import net.minecraft.util.Direction;
+import net.minecraft.util.Hand;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.BlockRayTraceResult;
 import net.minecraft.util.math.MutableBoundingBox;
+import net.minecraft.util.math.vector.Vector3d;
 import net.minecraft.world.server.ServerWorld;
 
 /**
@@ -34,6 +39,7 @@ public class IntegrationTestHelper
     private final List<Supplier<String>> assertions;
     private final List<ScheduledAction> scheduledActions;
 
+    private int lastScheduledAction; // The last scheduled action - time out ticks are added onto this value
     private boolean failFast; // If conditions will never be set to true
 
     public IntegrationTestHelper(ServerWorld world, IntegrationTestRunner test, BlockPos origin, BlockPos size)
@@ -56,6 +62,53 @@ public class IntegrationTestHelper
     public void destroyBlock(BlockPos pos, boolean dropBlock)
     {
         relativePos(pos).ifPresent(actualPos -> world.destroyBlock(actualPos, dropBlock));
+    }
+
+    public void placeBlock(BlockPos pos, Direction direction, Block block)
+    {
+        Item item = block.asItem();
+        if (item instanceof BlockItem)
+        {
+            placeBlock(pos, direction, (BlockItem) item);
+        }
+        else
+        {
+            fail("Tried to place a block which was not an item");
+        }
+    }
+
+    public void placeBlock(BlockPos pos, Direction direction, BlockItem blockItem)
+    {
+        placeBlock(pos, direction, blockItem, Vector3d.ZERO);
+    }
+
+    public void placeBlock(BlockPos pos, Direction direction, BlockItem blockItem, Vector3d hitVec)
+    {
+        relativePos(pos).ifPresent(actualPos -> {
+            ItemStack stack = new ItemStack(blockItem);
+            BlockRayTraceResult rayTrace = new BlockRayTraceResult(hitVec, direction, actualPos, false);
+            BlockItemUseContext context = new BlockItemUseContext(world, null, Hand.MAIN_HAND, stack, rayTrace) {};
+            blockItem.place(context);
+        });
+    }
+
+    public void useItem(BlockPos pos, Direction direction, Item item)
+    {
+        useItem(pos, direction, new ItemStack(item));
+    }
+
+    public void useItem(BlockPos pos, Direction direction, ItemStack stack)
+    {
+        useItem(pos, direction, stack, Vector3d.ZERO);
+    }
+
+    public void useItem(BlockPos pos, Direction direction, ItemStack stack, Vector3d hitVec)
+    {
+        relativePos(pos).ifPresent(actualPos -> {
+            BlockRayTraceResult rayTrace = new BlockRayTraceResult(hitVec, direction, actualPos, false);
+            ItemUseContext context = new ItemUseContext(world, null, Hand.MAIN_HAND, stack, rayTrace) {};
+            stack.useOn(context);
+        });
     }
 
     public void setBlockState(BlockPos pos, BlockState state)
@@ -85,13 +138,28 @@ public class IntegrationTestHelper
         });
     }
 
-    public void runAfterTicks(int ticks, Runnable action)
+    /**
+     * Execute an action after a certain number of ticks have elapsed
+     *
+     * @param ticks  The number of ticks to wait
+     * @param action The action to execute
+     * @return A helper can be used to schedule subsequent actions
+     */
+    public ScheduleHelper runAfter(int ticks, Runnable action)
     {
-        if (ticks >= test.getTimeoutTicks())
-        {
-            fail("Action set to execute after " + ticks + " ticks but this test will time out at " + test.getTimeoutTicks() + " ticks");
-            scheduledActions.add(new ScheduledAction(ticks, action));
-        }
+        scheduledActions.add(new ScheduledAction(ticks, action));
+        lastScheduledAction = Math.max(lastScheduledAction, ticks);
+        return new ScheduleHelper(ticks);
+    }
+
+    /**
+     * Creates a scheduler for running subsequent actions
+     *
+     * @return A scheduler.
+     */
+    public ScheduleHelper scheduler()
+    {
+        return new ScheduleHelper(0);
     }
 
     public BlockState getBlockState(BlockPos pos)
@@ -259,21 +327,26 @@ public class IntegrationTestHelper
 
     Optional<TestResult> tick(int currentTick)
     {
-        // Execute scheduled actions
-        Iterator<ScheduledAction> iterator = scheduledActions.iterator();
-        while (iterator.hasNext())
+        if (!scheduledActions.isEmpty())
         {
-            ScheduledAction action = iterator.next();
-            if (action.ticks == currentTick)
+            // If actions are remaining, execute them
+            final Iterator<ScheduledAction> iterator = scheduledActions.iterator();
+            while (iterator.hasNext())
             {
-                action.action.run();
-                iterator.remove();
+                ScheduledAction action = iterator.next();
+                if (action.ticks <= currentTick)
+                {
+                    action.action.run();
+                    iterator.remove();
+                }
             }
         }
-        if (currentTick % test.getRefreshTicks() == 0)
+        else if (currentTick % test.getRefreshTicks() == 0)
         {
+            // No remaining scheduled actions, so update conditions every refresh interval
+
             // Refresh conditions
-            List<String> failures = new ArrayList<>();
+            final List<String> failures = new ArrayList<>();
             for (Supplier<String> assertion : assertions)
             {
                 String error = assertion.get();
@@ -283,20 +356,22 @@ public class IntegrationTestHelper
                 }
             }
 
+            final int timeoutTicks = lastScheduledAction + test.getTimeoutTicks();
+
             if (failures.isEmpty())
             {
-                // Test passed!
+                // No fails or scheduled actions - Test passed!
                 return TestResult.success();
             }
             if (failFast)
             {
-                // Fail fast
+                // Fail fast - used for invalid test configurations or direct calls to unconditional failures
                 return TestResult.fail(failures);
             }
-            if (test.getTimeoutTicks() != -1 && currentTick >= test.getTimeoutTicks())
+            if (timeoutTicks != -1 && currentTick >= timeoutTicks)
             {
                 // Test failed due to time out
-                failures.add(test.getName() + " Failed after time out at " + test.getTimeoutTicks() + " ticks.");
+                failures.add(test.getName() + " Failed after time out at " + timeoutTicks + " ticks.");
                 return TestResult.fail(failures);
             }
         }
@@ -311,6 +386,43 @@ public class IntegrationTestHelper
     IntegrationTestRunner getTest()
     {
         return test;
+    }
+
+    void run()
+    {
+        test.getTestAction().accept(this);
+    }
+
+    public final class ScheduleHelper
+    {
+        final int currentTicks;
+
+        ScheduleHelper(int currentTicks)
+        {
+            this.currentTicks = currentTicks;
+        }
+
+        /**
+         * Execute a subsequent action
+         *
+         * @param extraTicks An additional number of ticks to wait
+         * @param action     The action to execute
+         * @return A helper for scheduling subsequent actions
+         */
+        public ScheduleHelper thenRun(int extraTicks, Runnable action)
+        {
+            return runAfter(currentTicks + extraTicks, action);
+        }
+
+        /**
+         * Wait an amount of ticks
+         *
+         * @return A helper for scheduling subsequent actions
+         */
+        public ScheduleHelper thenWait(int extraTicks)
+        {
+            return runAfter(currentTicks + extraTicks, () -> {});
+        }
     }
 
     static final class ScheduledAction

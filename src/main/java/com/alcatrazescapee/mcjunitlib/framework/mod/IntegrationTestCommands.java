@@ -2,7 +2,6 @@ package com.alcatrazescapee.mcjunitlib.framework.mod;
 
 import net.minecraft.command.CommandSource;
 import net.minecraft.command.Commands;
-import net.minecraft.util.text.StringTextComponent;
 
 import com.alcatrazescapee.mcjunitlib.framework.IntegrationTestManager;
 import com.mojang.brigadier.Command;
@@ -28,14 +27,7 @@ final class IntegrationTestCommands
 
     private static int runAllTests(CommandSource source)
     {
-        if (IntegrationTestManager.INSTANCE.runAllTests(source.getLevel()))
-        {
-            source.sendSuccess(new StringTextComponent("Running!"), true);
-        }
-        else
-        {
-            source.sendFailure(new StringTextComponent("Cannot run tests now! Tests are not properly setup."));
-        }
+        IntegrationTestManager.INSTANCE.runAllTests(source.getLevel(), source);
         return Command.SINGLE_SUCCESS;
     }
 
@@ -44,10 +36,6 @@ final class IntegrationTestCommands
         if (IntegrationTestManager.INSTANCE.verifyAllTests(source.getLevel(), source))
         {
             IntegrationTestManager.INSTANCE.setupAllTests(source.getLevel(), source);
-        }
-        else
-        {
-            source.sendFailure(new StringTextComponent("One or more tests failed verification!"));
         }
         return Command.SINGLE_SUCCESS;
     }

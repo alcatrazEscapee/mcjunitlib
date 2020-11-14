@@ -1,44 +1,32 @@
 package com.alcatrazescapee.mcjunitlib.framework;
 
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import javax.annotation.Nullable;
+import java.util.function.Consumer;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import net.minecraft.util.ResourceLocation;
 
 class IntegrationTestRunner
 {
-    private static final Logger LOGGER = LogManager.getLogger();
-
     private final Class<?> clazz;
-    private final Method method;
-    private final Object instance;
+    private final Consumer<IntegrationTestHelper> testAction;
+    private final String testName;
     private final ResourceLocation templateName;
 
     private final int refreshTicks;
     private final int timeoutTicks;
 
-    IntegrationTestRunner(String modId, Class<?> clazz, Method method, IntegrationTest methodAnnotation, @Nullable Object instance)
+    IntegrationTestRunner(Class<?> clazz, Consumer<IntegrationTestHelper> testAction, String testName, ResourceLocation templateName, int refreshTicks, int timeoutTicks)
     {
         this.clazz = clazz;
-        this.method = method;
-        this.instance = instance;
-        this.refreshTicks = methodAnnotation.refreshTicks();
-        this.timeoutTicks = methodAnnotation.timeoutTicks();
-
-        IntegrationTestClass classAnnotation = clazz.getDeclaredAnnotation(IntegrationTestClass.class);
-        String className = classAnnotation != null ? classAnnotation.value() : clazz.getName();
-        String testName = !"".equals(methodAnnotation.value()) ? methodAnnotation.value() : method.getName();
-
-        this.templateName = new ResourceLocation(modId, (className + '/' + testName).toLowerCase());
-
+        this.testAction = testAction;
+        this.testName = testName;
+        this.templateName = templateName;
+        this.refreshTicks = refreshTicks;
+        this.timeoutTicks = timeoutTicks;
     }
 
     String getName()
     {
-        return clazz.getSimpleName() + "." + method.getName() + "()";
+        return testName;
     }
 
     ResourceLocation getTemplateName()
@@ -61,17 +49,8 @@ class IntegrationTestRunner
         return refreshTicks;
     }
 
-    void run(IntegrationTestHelper helper)
+    Consumer<IntegrationTestHelper> getTestAction()
     {
-        try
-        {
-            method.invoke(instance, helper);
-        }
-        catch (IllegalAccessException | InvocationTargetException e)
-        {
-            LOGGER.warn("Unable to resolve integration test at {} (Cannot Invoke Method - {})", getName(), e.getMessage());
-            LOGGER.debug("Error", e);
-            helper.fail("Reflection Error: " + e.getMessage());
-        }
+        return testAction;
     }
 }
