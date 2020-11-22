@@ -81,15 +81,28 @@ jar {
 
 jar.finalizedBy('reobfJar')
 
-task sourcesJar(type: Jar, dependsOn: classes) {
+if (JavaVersion.current().isJava8Compatible()) {
+    tasks.withType(Javadoc) {
+        options.addStringOption('Xdoclint:none', '-quiet')
+    }
+}
+
+task sourcesJar(type: Jar) {
+    from sourceSets.main.allJava
     classifier = 'sources'
-    from sourceSets.main.allSource
+}
+
+task javadocJar(type: Jar) {
+    from javadoc
+    classifier = 'javadoc'
 }
 
 publishing {
     publications {
         mavenJava(MavenPublication) {
             from components.java
+            artifact sourcesJar
+            artifact javadocJar
 
             groupId = 'com.github.alcatrazEscapee'
             artifactId = "mcjunitlib"
@@ -100,11 +113,6 @@ publishing {
                 asNode().dependencies.dependency.each { dep ->
                     assert dep.parent().remove(dep)
                 }
-            }
-
-            // Adds the sources as an artifact.
-            artifact sourcesJar {
-                classifier 'sources'
             }
         }
     }

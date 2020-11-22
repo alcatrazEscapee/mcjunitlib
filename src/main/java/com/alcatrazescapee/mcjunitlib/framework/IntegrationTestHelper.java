@@ -10,10 +10,14 @@ import java.util.function.Supplier;
 import javax.annotation.Nullable;
 
 import net.minecraft.block.*;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.fluid.Fluid;
 import net.minecraft.fluid.FluidState;
 import net.minecraft.fluid.Fluids;
-import net.minecraft.item.*;
+import net.minecraft.item.BlockItem;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.ItemUseContext;
 import net.minecraft.tags.ITag;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.tileentity.TileEntityType;
@@ -24,6 +28,7 @@ import net.minecraft.util.math.BlockRayTraceResult;
 import net.minecraft.util.math.MutableBoundingBox;
 import net.minecraft.util.math.vector.Vector3d;
 import net.minecraft.world.server.ServerWorld;
+import net.minecraftforge.common.util.FakePlayerFactory;
 
 /**
  * @see IntegrationTest
@@ -69,27 +74,22 @@ public class IntegrationTestHelper
         Item item = block.asItem();
         if (item instanceof BlockItem)
         {
-            placeBlock(pos, direction, (BlockItem) item);
+            useItem(pos, direction, item);
         }
         else
         {
-            fail("Tried to place a block which was not an item");
+            fail("Tried to place a block which was not a BlockItem");
         }
     }
 
     public void placeBlock(BlockPos pos, Direction direction, BlockItem blockItem)
     {
-        placeBlock(pos, direction, blockItem, Vector3d.ZERO);
+        useItem(pos, direction, new ItemStack(blockItem), Vector3d.ZERO);
     }
 
     public void placeBlock(BlockPos pos, Direction direction, BlockItem blockItem, Vector3d hitVec)
     {
-        relativePos(pos).ifPresent(actualPos -> {
-            ItemStack stack = new ItemStack(blockItem);
-            BlockRayTraceResult rayTrace = new BlockRayTraceResult(hitVec, direction, actualPos, false);
-            BlockItemUseContext context = new BlockItemUseContext(world, null, Hand.MAIN_HAND, stack, rayTrace) {};
-            blockItem.place(context);
-        });
+        useItem(pos, direction, new ItemStack(blockItem), hitVec);
     }
 
     public void useItem(BlockPos pos, Direction direction, Item item)
@@ -105,8 +105,9 @@ public class IntegrationTestHelper
     public void useItem(BlockPos pos, Direction direction, ItemStack stack, Vector3d hitVec)
     {
         relativePos(pos).ifPresent(actualPos -> {
+            PlayerEntity player = FakePlayerFactory.getMinecraft(world); // This is required because forge NPEs in place block
             BlockRayTraceResult rayTrace = new BlockRayTraceResult(hitVec, direction, actualPos, false);
-            ItemUseContext context = new ItemUseContext(world, null, Hand.MAIN_HAND, stack, rayTrace) {};
+            ItemUseContext context = new ItemUseContext(world, player, Hand.MAIN_HAND, stack, rayTrace) {};
             stack.useOn(context);
         });
     }
