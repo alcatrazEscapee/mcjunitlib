@@ -4,15 +4,16 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.*;
+import java.util.function.BiConsumer;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
 
+import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.LecternBlock;
-import net.minecraft.command.CommandSource;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.nbt.CompoundNBT;
@@ -23,7 +24,6 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.Direction;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.text.StringTextComponent;
 import net.minecraft.world.gen.feature.template.PlacementSettings;
 import net.minecraft.world.gen.feature.template.Template;
 import net.minecraft.world.gen.feature.template.TemplateManager;
@@ -49,6 +49,7 @@ public enum IntegrationTestManager
     private static final Type INTEGRATION_TEST_FACTORY = Type.getType(IntegrationTestFactory.class);
 
     private static final Logger LOGGER = LogManager.getLogger("IntegrationTests");
+    private static final Level UNIT_TEST = Level.forName("UNITTEST", 50);
 
     /**
      * The entry point for unit tests.
@@ -224,7 +225,17 @@ public enum IntegrationTestManager
         this.status = Status.WAITING;
     }
 
-    public boolean verifyAllTests(ServerWorld world, CommandSource source)
+    public boolean isComplete()
+    {
+        return status == Status.FINISHED;
+    }
+
+    public boolean hasFailedTests()
+    {
+        return failedTests > 0;
+    }
+
+    public boolean verifyAllTests(ServerWorld world, BiConsumer<String, Boolean> logger)
     {
         if (status == Status.WAITING)
         {
@@ -234,23 +245,23 @@ public enum IntegrationTestManager
             {
                 if (manager.get(test.getTemplateName()) == null)
                 {
-                    source.sendFailure(new StringTextComponent("Test '").append(test.getName()).append("' failed verification: No template '").append(test.getTemplateName().toString()).append("' found"));
+                    logger.accept("Test '" + test.getName() + "' failed verification: No template '" + test.getTemplateName() + "' found.", false);
                     allPassed = false;
                 }
             }
             if (allPassed)
             {
                 status = Status.VERIFIED;
-                source.sendSuccess(new StringTextComponent("Setup all tests!"), true);
+                logger.accept("Setup all tests.", true);
                 return true;
             }
-            source.sendFailure(new StringTextComponent("One or more tests failed verification!"));
+            logger.accept("One more more tests failed verification.", false);
             return false;
         }
         return true;
     }
 
-    public void setupAllTests(ServerWorld world, CommandSource source)
+    public void setupAllTests(ServerWorld world, BiConsumer<String, Boolean> logger)
     {
         if (status == Status.VERIFIED || status == Status.FINISHED || status == Status.SETUP)
         {
@@ -340,33 +351,45 @@ public enum IntegrationTestManager
                 cursor.setX(0);
                 cursor.move(Direction.SOUTH, maxZSize + 2 + 3); // +z
             }
-            source.sendSuccess(new StringTextComponent("Setup Finished!"), true);
-            return;
+            logger.accept("Setup Finished!", true);
         }
-        source.sendFailure(new StringTextComponent("Setup not possible - tests may still be running"));
+        else
+        {
+            logger.accept("Setup not possible - tests may still be running.", false);
+        }
     }
 
-    public void runAllTests(ServerWorld world, CommandSource source)
+    public void runAllTests(ServerWorld world, BiConsumer<String, Boolean> logger)
     {
         if (status == Status.SETUP)
         {
-            for (IntegrationTestHelper activeTest : activeTests)
+            if (activeTests.isEmpty())
             {
-                // Run tests and setup conditions
-                activeTest.run();
-
-                // Update the log book
-                TileEntity te = world.getBlockEntity(activeTest.getOrigin().offset(-2, 0, -2));
-                if (te instanceof LecternTileEntity)
-                {
-                    editLogBook(((LecternTileEntity) te).getBook(), activeTest.getTest().getName(), "Running", Collections.emptyList());
-                }
+                logger.accept("No tests found.", true);
+                status = Status.FINISHED;
             }
-            status = Status.RUNNING;
-            source.sendSuccess(new StringTextComponent("Running!"), true);
-            return;
+            else
+            {
+                for (IntegrationTestHelper activeTest : activeTests)
+                {
+                    // Run tests and setup conditions
+                    activeTest.run();
+
+                    // Update the log book
+                    TileEntity te = world.getBlockEntity(activeTest.getOrigin().offset(-2, 0, -2));
+                    if (te instanceof LecternTileEntity)
+                    {
+                        editLogBook(((LecternTileEntity) te).getBook(), activeTest.getTest().getName(), "Running", Collections.emptyList());
+                    }
+                }
+                status = Status.RUNNING;
+                logger.accept("Running Tests...", true);
+            }
         }
-        source.sendFailure(new StringTextComponent("Cannot run tests now! Current status = " + status.name().toLowerCase()));
+        else
+        {
+            logger.accept("Cannot run tests now! Current status = " + status.name().toLowerCase(), false);
+        }
     }
 
     public void tick(ServerWorld world)
@@ -393,10 +416,10 @@ public enum IntegrationTestManager
                         // Send failure messages!
                         if (!result.getErrors().isEmpty())
                         {
-                            LOGGER.error("Test Failed {}", helper.getTest().getName());
+                            LOGGER.log(UNIT_TEST, "Test Failed {}", helper.getTest().getName());
                             for (String error : result.getErrors())
                             {
-                                LOGGER.error(error);
+                                LOGGER.log(UNIT_TEST, error);
                             }
                         }
                     }
@@ -419,9 +442,9 @@ public enum IntegrationTestManager
             if (activeTests.isEmpty())
             {
                 int totalTests = passedTests + failedTests;
-                LOGGER.info("Integration Testing Complete!");
-                LOGGER.info("Passed: {} / {} ({} %)", passedTests, totalTests, String.format("%.1f", 100f * passedTests / totalTests));
-                LOGGER.info("Failed: {} / {} ({} %)", failedTests, totalTests, String.format("%.1f", 100f * failedTests / totalTests));
+                LOGGER.log(UNIT_TEST, "Integration Testing Complete!");
+                LOGGER.log(UNIT_TEST, "Passed: {} / {} ({} %)", passedTests, totalTests, String.format("%.1f", 100f * passedTests / totalTests));
+                LOGGER.log(UNIT_TEST, "Failed: {} / {} ({} %)", failedTests, totalTests, String.format("%.1f", 100f * failedTests / totalTests));
 
                 status = Status.FINISHED;
             }

@@ -24,57 +24,27 @@ dependencies {
 }
 ```
 
-The latest versions can be checked by looking at the [releases](https://github.com/alcatrazEscapee/mcjunitlib/releases) page. As of time of writing (2020-11-12), the latest versions are:
+The latest versions can be checked by looking at the [releases](https://github.com/alcatrazEscapee/mcjunitlib/releases) page. As of time of writing (2021-04-17), the latest versions are:
 
-- Minecraft 1.16.4: `1.3.0`
+- Minecraft 1.16.5: `1.4.0` (Latest)
 - Minecraft 1.15.2: `1.0.1`
 
 Note: This mod will package the JUnit 5 API as part of the mod jar. This is important - do not add a dependency on JUnit manually as Forge will only load mod classes using the transforming class loader which is required in order to access minecraft source code without everything crashing and burning.
 
-Then, for [Unit Tests](#unit-tests), the following run configuration is required.
+Then, in order to setup tests, the following run configuration is required:
 
 - Make sure to replace `modid` with your mod id, or use the `${mod_id}` replacement.
-- This run configuration inherits from the standard `server` configuration. It will run a customized `MinecraftServer` instance.
 
 ```groovy
-unitTests {
+serverTest {
     parent runs.server // This run config inherits settings from the server config
     workingDirectory project.file('run')
     main 'com.alcatrazescapee.mcjunitlib.DedicatedTestServerLauncher' // The main class which launches a customized server which then runs JUnit tests
     ideaModule "${project.name}.test" // Tell IDEA to use the classpath of the test module
-    property 'forge.logging.console.level', 'unittest' // This logging level prevents any other server information messages and leaves only the unit test output
-    environment 'MOD_CLASSES', String.join(File.pathSeparator,
-        "${mod_id}%%${sourceSets.main.output.resourcesDir}",
-        "${mod_id}%%${sourceSets.main.output.classesDir}",
-        "${mod_id}%%${sourceSets.test.output.resourcesDir}",
-        "${mod_id}%%${sourceSets.test.output.classesDir}",
-    ) // Forge will ignore all test sources unless we explicitly tell it to include them as mod sources
+    property 'forge.logging.console.level', 'unittest' // This logging level prevents any other server information messages and leaves only the test output
+    environment 'MOD_CLASSES', testClasses
     environment 'target', 'fmltestserver' // This is a custom service used to launch with ModLauncher's transforming class loader
-    mods {
-        modid { // The mod that is being tested - Replace this with your mod ID!
-            sources sourceSets.main
-        }
-    }
-}
-```
-
-If [Integration Tests](#integration-tests) are desired, add the following run configuration:
-
-- As above, Make sure to replace `modid` with your mod id, or use the `${mod_id}` replacement.
-- This is **not** a fully automated configuration. It launches the Minecraft client - in order to run the integration tests, a world needs to be created, loaded, and two commands run. (See [Integration Tests](#integration-tests) for details.)
-
-```groovy
-integrationTests {
-    parent runs.client // This is a client run configuration, it will launch a client.
-    workingDirectory project.file('run')
-    ideaModule "${project.name}.test"
-    property 'forge.logging.console.level', 'debug'
-    environment 'MOD_CLASSES', String.join(File.pathSeparator,
-        "${mod_id}%%${sourceSets.main.output.resourcesDir}",
-        "${mod_id}%%${sourceSets.main.output.classesDir}",
-        "${mod_id}%%${sourceSets.test.output.resourcesDir}",
-        "${mod_id}%%${sourceSets.test.output.classesDir}",
-    ) // Forge will ignore all test sources unless we explicitly tell it to include them as mod sources
+    arg '--crashOnFailedTests' // Optional. Recommended when running in an automated environment. Without it, the server will continue running (and can be connected to via localhost) to inspect why tests failed.
     mods {
         modid {
             sources sourceSets.main, sourceSets.test
@@ -83,14 +53,12 @@ integrationTests {
 }
 ```
 
-After editing either run configuration, run `genIntellijRuns` (or equivalent for your IDE) and the `runUnitTests` or `runIntegrationTests` configuration will be generated.
+After editing run configuration, run `genIntellijRuns` (or equivalent for your IDE) and the `runServerTest` will be generated.
 
 
 ## Unit Tests
 
 Using unit tests are fairly straightforward if you are familiar with how JUnit tests work. A server instance will be running, and you can access it via `ServerLifecycleHooks.getCurrentServer()`. It is advised that tests that would interact directly with the `World` are done as [Integration Tests](#integration-tests) instead. Unit tests should be short, simple, and focused.
-
-When `runUnitTests` is ran, the log output (by default) will *only* contain messages from unit test code.
 
 Tests should be placed in the `src/test/java` module. Resources can be placed in `src/test/resources`. Tests are standard JUnit 5 tests, for more information consult their documentation. Below is an example test class:
 
@@ -138,10 +106,15 @@ Integration tests are slightly more complex to construct, but the results are mu
 1) First, build the test. This can be anything that is saveable using a vanilla structure block.
 2) Save the structure, using the vanilla structure block. Once it is saved, move the generated `.nbt` file to your mod `src/test/resources` sources.
 3) Write a test class and method. Each method must match up exactly with a structure file.
-4) Add an entry point for the integration test infrastructure into your test sources (`src/main/test`) - more on this later.
-5) Create a new world, with the world type "Superflat", Disable Structures, Creative, and Cheats Enabled.
-7) Run `/integrationTests setup`. This will build all integration tests.
-8) Run `/integrationTests run`. This will run all integration tests. Success will result in green beacon beams. Failures will result in red beacon beams and errors emitted to the log.
+4) Add an [Entry Point](#integration-test-entry-point) for the integration test infrastructure into your test sources (`src/main/test`).
+
+When the test server is ran, integration tests will be constructed and ran, and can be viewed by connecting to the server after tests have finished (if `--crashOnFailedTests` was not passed in).
+
+In order to run the integration tests manually:
+
+1) Create a new world, with the world type "Superflat", Disable Structures, Creative, and Cheats Enabled.
+2) Run `/integrationTests setup`. This will build all integration tests.
+3) Run `/integrationTests run`. This will run all integration tests. Success will result in green beacon beams. Failures will result in red beacon beams and errors emitted to the log.
 
 You can re-run `setup` and `run` as many times as necessary, provided they execute in that order. While tests are running, they will be indicated by a gray beacon beam. Only once tests have all finished (all beacon beams are red or green) can you run the tests again.
 
@@ -178,7 +151,9 @@ There are a few important things to note here:
 - Test methods MUST be annotated with `@IntegrationTest`.
 - Test methods MUST have one parameter, of type `IntegrationTestHelper`. This is used to interact with the world directly, and characterize success and failure of the test via various `assert[Thing]` methods.
 
-Finally, in order for integration tests to work at all, it needs to be initialized by mod code. You will need to add the following class (or something functionally equivalent) into your test sources. This will trigger mcjunitlib to register commands, edit the spawn location, and locate test classes and methods.
+### Integration Test Entry Point
+
+In order for integration tests to work at all, it needs to be initialized by mod code. You will need to add the following class (or something functionally equivalent) into your test sources. This will trigger mcjunitlib to register commands, edit the spawn location, and locate test classes and methods.
 
 ```java
 package example;

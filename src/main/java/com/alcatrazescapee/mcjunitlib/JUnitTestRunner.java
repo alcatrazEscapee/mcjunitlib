@@ -35,8 +35,12 @@ public class JUnitTestRunner implements TestExecutionListener
     private static final Logger LOGGER = LogManager.getLogger("UnitTests");
     private static final String HR = "--------------------------------------------------";
 
+    private int failedTests;
+
     public void runAllTests()
     {
+        failedTests = 0;
+
         // See FMLCommonLaunchHandler#processModClassesEnvironmentVariable
         String modClasses = Optional.ofNullable(System.getenv("MOD_CLASSES")).orElse("");
         LOGGER.debug("Got mod coordinates {} from env", modClasses);
@@ -91,6 +95,8 @@ public class JUnitTestRunner implements TestExecutionListener
             String millis = timeMillis == 0 ? "< 1" : String.valueOf(timeMillis);
             String seconds = timeMillis < 1000 ? "< 1" : String.valueOf(timeMillis / 1000);
             LOGGER.log(UNIT_TEST, "Finished Execution in {} s ({} ms)", seconds, millis);
+
+            failedTests = (int) summary.getTestsFailedCount();
         }
         else
         {
@@ -133,6 +139,11 @@ public class JUnitTestRunner implements TestExecutionListener
     public void executionFinished(TestIdentifier testIdentifier, TestExecutionResult testExecutionResult)
     {
         LOGGER.log(UNIT_TEST, "Finished {}", getDisplayName(testIdentifier));
+    }
+
+    public boolean hasFailedTests()
+    {
+        return failedTests > 0;
     }
 
     private String getDisplayName(TestIdentifier testIdentifier)
