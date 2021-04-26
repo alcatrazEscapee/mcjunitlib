@@ -17,7 +17,6 @@ import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import org.junit.platform.engine.TestExecutionResult;
 import org.junit.platform.engine.TestSource;
 import org.junit.platform.engine.discovery.DiscoverySelectors;
 import org.junit.platform.engine.support.descriptor.ClassSource;
@@ -35,11 +34,13 @@ public class JUnitTestRunner implements TestExecutionListener
     private static final Logger LOGGER = LogManager.getLogger("UnitTests");
     private static final String HR = "--------------------------------------------------";
 
-    private int failedTests;
+    private int testCounter;
+    private boolean failedTests;
 
     public void runAllTests()
     {
-        failedTests = 0;
+        testCounter = 1;
+        failedTests = false;
 
         // See FMLCommonLaunchHandler#processModClassesEnvironmentVariable
         String modClasses = Optional.ofNullable(System.getenv("MOD_CLASSES")).orElse("");
@@ -71,8 +72,8 @@ public class JUnitTestRunner implements TestExecutionListener
                 LOGGER.log(UNIT_TEST, "Failures:");
                 for (TestExecutionSummary.Failure failure : summary.getFailures())
                 {
-                    LOGGER.log(UNIT_TEST, "Test {} Failed: {}", failure.getTestIdentifier().getDisplayName(), failure.getException().getMessage());
-                    LOGGER.log(UNIT_TEST, "Failure Reason:", failure.getException());
+                    LOGGER.log(UNIT_TEST, "Test {} Failed: {}", failure.getTestIdentifier().getDisplayName(), failure.getException().toString());
+                    LOGGER.debug("Failure Reason:", failure.getException());
                 }
             }
 
@@ -96,7 +97,7 @@ public class JUnitTestRunner implements TestExecutionListener
             String seconds = timeMillis < 1000 ? "< 1" : String.valueOf(timeMillis / 1000);
             LOGGER.log(UNIT_TEST, "Finished Execution in {} s ({} ms)", seconds, millis);
 
-            failedTests = (int) summary.getTestsFailedCount();
+            failedTests = summary.getTestsFailedCount() > 0;
         }
         else
         {
@@ -118,32 +119,28 @@ public class JUnitTestRunner implements TestExecutionListener
     }
 
     @Override
-    public void dynamicTestRegistered(TestIdentifier testIdentifier)
-    {
-        LOGGER.log(UNIT_TEST, "Registered: {}", getDisplayName(testIdentifier));
-    }
-
-    @Override
     public void executionSkipped(TestIdentifier testIdentifier, String reason)
     {
-        LOGGER.log(UNIT_TEST, "Skipped {} due to {}", getDisplayName(testIdentifier), reason);
+        if (testIdentifier.isTest())
+        {
+            LOGGER.log(UNIT_TEST, "{}. Skipped {} due to {}", testCounter, getDisplayName(testIdentifier), reason);
+            testCounter++;
+        }
     }
 
     @Override
     public void executionStarted(TestIdentifier testIdentifier)
     {
-        LOGGER.log(UNIT_TEST, "Running {}", getDisplayName(testIdentifier));
-    }
-
-    @Override
-    public void executionFinished(TestIdentifier testIdentifier, TestExecutionResult testExecutionResult)
-    {
-        LOGGER.log(UNIT_TEST, "Finished {}", getDisplayName(testIdentifier));
+        if (testIdentifier.isTest())
+        {
+            LOGGER.log(UNIT_TEST, "{}. Running {}", testCounter, getDisplayName(testIdentifier));
+            testCounter++;
+        }
     }
 
     public boolean hasFailedTests()
     {
-        return failedTests > 0;
+        return failedTests;
     }
 
     private String getDisplayName(TestIdentifier testIdentifier)

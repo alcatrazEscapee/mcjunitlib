@@ -26,7 +26,7 @@ dependencies {
 
 The latest versions can be checked by looking at the [releases](https://github.com/alcatrazEscapee/mcjunitlib/releases) page. As of time of writing (2021-04-17), the latest versions are:
 
-- Minecraft 1.16.5: `1.4.0` (Latest)
+- Minecraft 1.16.5: `1.4.1` (Latest)
 - Minecraft 1.15.2: `1.0.1`
 
 Note: This mod will package the JUnit 5 API as part of the mod jar. This is important - do not add a dependency on JUnit manually as Forge will only load mod classes using the transforming class loader which is required in order to access minecraft source code without everything crashing and burning.
@@ -34,6 +34,8 @@ Note: This mod will package the JUnit 5 API as part of the mod jar. This is impo
 Then, in order to setup tests, the following run configuration is required:
 
 - Make sure to replace `modid` with your mod id, or use the `${mod_id}` replacement.
+- The `arg '--crashOnFailedTests'` is optional, recommended for a CI environment, it will cause failed tests to crash the server and exit (as opposed to continuing to run the server, allowing a local player to connect and inspect failed tests).
+- The `forceExit = false` is optional, recommended for a CI environment, when not using the IDE run configurations.
 
 ```groovy
 serverTest {
@@ -45,6 +47,7 @@ serverTest {
     environment 'MOD_CLASSES', testClasses
     environment 'target', 'fmltestserver' // This is a custom service used to launch with ModLauncher's transforming class loader
     arg '--crashOnFailedTests' // Optional. Recommended when running in an automated environment. Without it, the server will continue running (and can be connected to via localhost) to inspect why tests failed.
+    forceExit = false // Optional. Recommended when running in an automated environment, or via the console rather than run configurations. This will allow the task to pass successfully when all tests pass. Use if you see errors along the lines of 'Gradle daemon disappeared unexpectedly'.
     mods {
         modid {
             sources sourceSets.main, sourceSets.test
@@ -103,9 +106,13 @@ This is the log output produced by `runServerTest` with the above test class:
 
 Integration tests are slightly more complex to construct, but the results are much more coverage of interacting mechanics, and in-world test cases. To create an integration test:
 
-1) First, build the test. This can be anything that is saveable using a vanilla structure block.
+1) First, build the test. This can be anything that is save-able using a vanilla structure block.
 2) Save the structure, using the vanilla structure block. Once it is saved, move the generated `.nbt` file to your mod `src/test/resources` sources.
 3) Write a test class and method. Each method must match up exactly with a structure file.
+
+- A structure will be searched for under `<test_class>/<test_name>.nbt`.
+- The `<test_class>` is either the lowercase name of the class, or the `value` field of a class annotated with `@IntegrationTestClass`, if present.
+- The `<test_name>` is either the lowercase name of the test method, or the `value` field of the `@IntegrationTest` annotation, if present.
 4) Add an [Entry Point](#integration-test-entry-point) for the integration test infrastructure into your test sources (`src/main/test`).
 
 When the test server is ran, integration tests will be constructed and ran, and can be viewed by connecting to the server after tests have finished (if `--crashOnFailedTests` was not passed in).
