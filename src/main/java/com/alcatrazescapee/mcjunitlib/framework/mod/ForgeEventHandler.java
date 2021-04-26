@@ -16,7 +16,6 @@ import com.alcatrazescapee.mcjunitlib.framework.IntegrationTestManager;
 
 /**
  * This is part of the mod features of the integration tests
- * It is registered conditionally in {@link IntegrationTestManager#setup(String)}
  */
 public final class ForgeEventHandler
 {

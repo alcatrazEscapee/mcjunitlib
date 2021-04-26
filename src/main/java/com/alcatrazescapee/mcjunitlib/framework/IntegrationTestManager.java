@@ -38,7 +38,6 @@ import org.objectweb.asm.Type;
 /**
  * Main handler for integration tests
  *
- * As a modder, all you should do is call {@link IntegrationTestManager#setup(String)} with your mod id.
  * The rest will be handled for you.
  */
 public enum IntegrationTestManager
@@ -51,22 +50,29 @@ public enum IntegrationTestManager
     private static final Logger LOGGER = LogManager.getLogger("IntegrationTests");
     private static final Level UNIT_TEST = Level.forName("UNITTEST", 50);
 
+    private static String bootstrapModId;
+
     /**
-     * The entry point for unit tests.
-     * This must be called from outside code, during {@link net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent}
-     *
      * @param modId The mod id in question
+     * @deprecated Use the `targetModId` environment variable instead, set from the runServerTest run config.
      */
-    @SuppressWarnings("unused")
+    @Deprecated
     public static void setup(String modId)
     {
+        bootstrapModId = modId;
+        LOGGER.warn("IntegrationTestManager#setup(String) is deprecated and will be removed at a later date. Use the `targetModId` environment variable instead");
+    }
+
+    public static void setup()
+    {
+        final String targetModId = Optional.ofNullable(System.getenv("targetModId")).orElse(bootstrapModId);
+
+        MinecraftForge.EVENT_BUS.register(new ForgeEventHandler());
         ModList.get().getAllScanData().stream()
             .map(ModFileScanData::getAnnotations)
             .flatMap(Collection::stream)
-            .flatMap(annotation -> createIntegrationTests(modId, annotation))
+            .flatMap(annotation -> createIntegrationTests(targetModId, annotation))
             .forEach(IntegrationTestManager.INSTANCE::add);
-
-        MinecraftForge.EVENT_BUS.register(new ForgeEventHandler());
     }
 
     private static Stream<IntegrationTestRunner> createIntegrationTests(String modId, ModFileScanData.AnnotationData annotation)

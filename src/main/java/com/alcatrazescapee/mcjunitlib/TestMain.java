@@ -44,6 +44,7 @@ import net.minecraft.world.storage.ServerWorldInfo;
 import net.minecraftforge.fml.common.ObfuscationReflectionHelper;
 import net.minecraftforge.fml.server.ServerModLoader;
 
+import com.alcatrazescapee.mcjunitlib.framework.IntegrationTestManager;
 import com.mojang.authlib.GameProfileRepository;
 import com.mojang.authlib.minecraft.MinecraftSessionService;
 import com.mojang.authlib.yggdrasil.YggdrasilAuthenticationService;
@@ -95,6 +96,10 @@ public class TestMain
             Bootstrap.validate();
             Util.startTimerHackThread();
             ServerModLoader.load();
+
+            // After mods have loaded, immediately setup for integration tests.
+            IntegrationTestManager.setup();
+
             DynamicRegistries.Impl builtinRegistries = DynamicRegistries.builtin();
 
             // Delete the old test world, we create a new one each run

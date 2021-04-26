@@ -52,6 +52,7 @@ serverTest {
     property 'forge.logging.console.level', 'unittest' // This logging level prevents any other server information messages and leaves only the test output
     environment 'MOD_CLASSES', testClasses
     environment 'target', 'fmltestserver' // This is a custom service used to launch with ModLauncher's transforming class loader
+    environment 'targetModId', "${mod_id}" // Pass the mod ID directly to mcjunitlib, to find integration test classes from the mod annotation scan data
     arg '--crashOnFailedTests' // Optional. Recommended when running in an automated environment. Without it, the server will continue running (and can be connected to via localhost) to inspect why tests failed.
     forceExit = false // Optional. Recommended when running in an automated environment, or via the console rather than run configurations. This will allow the task to pass successfully when all tests pass. Use if you see errors along the lines of 'Gradle daemon disappeared unexpectedly'.
     mods {
@@ -119,7 +120,6 @@ Integration tests are slightly more complex to construct, but the results are mu
 - A structure will be searched for under `<test_class>/<test_name>.nbt`.
 - The `<test_class>` is either the lowercase name of the class, or the `value` field of a class annotated with `@IntegrationTestClass`, if present.
 - The `<test_name>` is either the lowercase name of the test method, or the `value` field of the `@IntegrationTest` annotation, if present.
-4) Add an [Entry Point](#integration-test-entry-point) for the integration test infrastructure into your test sources (`src/main/test`).
 
 When the test server is ran, integration tests will be constructed and ran, and can be viewed by connecting to the server after tests have finished (if `--crashOnFailedTests` was not passed in).
 
@@ -163,27 +163,3 @@ There are a few important things to note here:
 - A test class MAY be annotated with `@IntegrationTestClass` (It is not required, but recommended). If it is omitted, the class name will be used directly to infer structure names.
 - Test methods MUST be annotated with `@IntegrationTest`.
 - Test methods MUST have one parameter, of type `IntegrationTestHelper`. This is used to interact with the world directly, and characterize success and failure of the test via various `assert[Thing]` methods.
-
-### Integration Test Entry Point
-
-In order for integration tests to work at all, it needs to be initialized by mod code. You will need to add the following class (or something functionally equivalent) into your test sources. This will trigger mcjunitlib to register commands, edit the spawn location, and locate test classes and methods.
-
-```java
-package example;
-
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
-
-import com.alcatrazescapee.mcjunitlib.framework.IntegrationTestManager;
-
-@Mod.EventBusSubscriber(modid = MyMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD)
-public class IntegrationTestEntryPoint
-{
-    @SubscribeEvent
-    public static void setup(FMLCommonSetupEvent event)
-    {
-        IntegrationTestManager.setup(MyMod.MOD_ID);
-    }
-}
-```

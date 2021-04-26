@@ -12,7 +12,6 @@ import com.mojang.brigadier.CommandDispatcher;
 
 /**
  * Part of the integration test mod features.
- * Needs to be initialized by calling {@link IntegrationTestManager#setup(String)}
  */
 final class IntegrationTestCommands
 {
