@@ -38,6 +38,12 @@ Then, in order to setup tests, the following run configuration is required:
 - The `forceExit = false` is optional, recommended for a CI environment, when not using the IDE run configurations.
 
 ```groovy
+def testClasses = String.join(File.pathSeparator,
+        "${mod_id}%%${sourceSets.main.output.resourcesDir}",
+        "${mod_id}%%${sourceSets.main.output.classesDirs.asPath}",
+        "${mod_id}%%${sourceSets.test.output.resourcesDir}",
+        "${mod_id}%%${sourceSets.test.output.classesDirs.asPath}")
+
 serverTest {
     parent runs.server // This run config inherits settings from the server config
     workingDirectory project.file('run')
