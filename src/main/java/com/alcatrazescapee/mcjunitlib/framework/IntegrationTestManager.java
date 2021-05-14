@@ -258,7 +258,7 @@ public enum IntegrationTestManager
             if (allPassed)
             {
                 status = Status.VERIFIED;
-                logger.accept("Setup all tests.", true);
+                logger.accept("Verified all tests.", true);
                 return true;
             }
             logger.accept("One more more tests failed verification.", false);

@@ -58,19 +58,24 @@ public class DedicatedTestServer extends DedicatedServer
         {
             return action.call();
         }
-        catch (Throwable t) { /* Probably not important */ }
-        throw new RuntimeException("oh noes");
+        catch (Throwable t)
+        {
+            throw new RuntimeException(t);
+        }
     }
 
     private final boolean crashOnFailedTests;
+
+    private int delayTicks;
+    private boolean allTestsFinished;
+    private boolean crashed;
+
     // Shadow from DedicatedServer
     private long lastOverloadWarning;
     private boolean mayHaveDelayedTasks;
     private long delayedTasksMaxNextTickTime;
     private boolean delayProfilerStart;
     private volatile boolean isReady;
-    private boolean allTestsFinished;
-    private boolean crashed;
 
     public DedicatedTestServer(Thread thread, DynamicRegistries.Impl dynamicRegistries, SaveFormat.LevelSave saveFormat, ResourcePackList resourcePacks, DataPackRegistries dataPacks, IServerConfiguration serverConfiguration, ServerPropertiesProvider serverProperties, DataFixer dataFixer, MinecraftSessionService service, GameProfileRepository profileRepository, PlayerProfileCache profileCache, IChunkStatusListenerFactory chunkStatusListenerFactory, boolean crashOnFailedTests)
     {
@@ -78,6 +83,7 @@ public class DedicatedTestServer extends DedicatedServer
 
         this.allTestsFinished = false;
         this.crashOnFailedTests = crashOnFailedTests;
+        this.delayTicks = 0;
     }
 
     public boolean crashed()
@@ -110,12 +116,8 @@ public class DedicatedTestServer extends DedicatedServer
 
                 final ServerWorld overworld = overworld();
                 final BiConsumer<String, Boolean> logger = (message, success) -> LOGGER.info((success ? "" : "ERROR : ") + message);
-                if (IntegrationTestManager.INSTANCE.verifyAllTests(overworld, logger))
-                {
-                    IntegrationTestManager.INSTANCE.setupAllTests(overworld, logger);
-                    IntegrationTestManager.INSTANCE.runAllTests(overworld, logger);
-                }
-                else
+                final boolean testsVerified = IntegrationTestManager.INSTANCE.verifyAllTests(overworld, logger);
+                if (!testsVerified)
                 {
                     LOGGER.log(UNIT_TEST, "Unable to verify all tests.");
                 }
@@ -147,22 +149,35 @@ public class DedicatedTestServer extends DedicatedServer
                     profiler.push("tick");
                     tickServer(this::haveTime);
 
-                    // Check test completions, and if so, stop server
-                    if (!allTestsFinished && IntegrationTestManager.INSTANCE.isComplete())
+                    if (testsVerified)
                     {
-                        // All tests complete
-                        allTestsFinished = true;
-                        LOGGER.log(UNIT_TEST, "All tests finished.");
-                        boolean failures = unitTestRunner.hasFailedTests() || IntegrationTestManager.INSTANCE.hasFailedTests();
-                        if (!failures)
+                        delayTicks++;
+                        if (delayTicks == 20)
                         {
-                            halt(false); // All tests passed, exit gracefully
+                            LOGGER.log(UNIT_TEST, "Running test setup...");
+                            IntegrationTestManager.INSTANCE.setupAllTests(overworld, logger);
                         }
-                        else if (crashOnFailedTests)
+                        else if (delayTicks == 40)
                         {
-                            throw new ReportedException(new CrashReport("Some tests have failed!", new Exception())); // Some tests failed, and we've specified to hard crash
+                            LOGGER.log(UNIT_TEST, "Running tests...");
+                            IntegrationTestManager.INSTANCE.runAllTests(overworld, logger);
                         }
-                        // Otherwise, just continue running. This is for debugging test failure states.
+                        else if (delayTicks > 40 && !allTestsFinished && IntegrationTestManager.INSTANCE.isComplete())
+                        {
+                            // Check test completions, and if so, stop server
+                            allTestsFinished = true;
+                            LOGGER.log(UNIT_TEST, "All tests finished.");
+                            boolean failures = unitTestRunner.hasFailedTests() || IntegrationTestManager.INSTANCE.hasFailedTests();
+                            if (!failures)
+                            {
+                                halt(false); // All tests passed, exit gracefully
+                            }
+                            else if (crashOnFailedTests)
+                            {
+                                throw new ReportedException(new CrashReport("Some tests have failed!", new Exception())); // Some tests failed, and we've specified to hard crash
+                            }
+                            // Otherwise, just continue running. This is for debugging test failure states.
+                        }
                     }
 
                     profiler.popPush("nextTickWait");
@@ -234,6 +249,16 @@ public class DedicatedTestServer extends DedicatedServer
     public long getMaxTickLength()
     {
         return 0; // Override to prevent server watchdog thread from starting and crashing long running tests
+    }
+
+    /**
+     * Override to use shadowed {@code haveTime()}
+     */
+    @Override
+    protected void waitUntilNextTick()
+    {
+        runAllTasks();
+        managedBlock(() -> !haveTime());
     }
 
     /**
