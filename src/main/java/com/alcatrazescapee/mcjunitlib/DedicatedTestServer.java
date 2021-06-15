@@ -147,7 +147,7 @@ public class DedicatedTestServer extends DedicatedServer
                     startProfilerTick();
                     profiler.startTick();
                     profiler.push("tick");
-                    tickServer(this::haveTime);
+                    tickServer(this::haveTimeShadow);
 
                     if (testsVerified)
                     {
@@ -258,7 +258,7 @@ public class DedicatedTestServer extends DedicatedServer
     protected void waitUntilNextTick()
     {
         runAllTasks();
-        managedBlock(() -> !haveTime());
+        managedBlock(() -> !haveTimeShadow());
     }
 
     /**
@@ -284,7 +284,7 @@ public class DedicatedTestServer extends DedicatedServer
     /**
      * Use shadowed fields, and the superclass method is private
      */
-    private boolean haveTime()
+    private boolean haveTimeShadow()
     {
         return runningTask() || Util.getMillis() < (mayHaveDelayedTasks ? delayedTasksMaxNextTickTime : nextTickTime);
     }
