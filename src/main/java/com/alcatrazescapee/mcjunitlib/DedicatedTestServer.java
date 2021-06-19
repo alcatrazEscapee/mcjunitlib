@@ -283,6 +283,7 @@ public class DedicatedTestServer extends DedicatedServer
 
     /**
      * Use shadowed fields, and the superclass method is private
+     * Hint: There is an issue with Forge de/obfuscation if this method is called "haveTime". https://github.com/alcatrazEscapee/mcjunitlib/issues/2
      */
     private boolean haveTimeShadow()
     {
