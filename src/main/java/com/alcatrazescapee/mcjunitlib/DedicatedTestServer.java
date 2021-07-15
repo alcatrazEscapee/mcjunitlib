@@ -147,7 +147,7 @@ public class DedicatedTestServer extends DedicatedServer
                     startProfilerTick();
                     profiler.startTick();
                     profiler.push("tick");
-                    tickServer(this::haveTime);
+                    tickServer(this::haveTimeShadow);
 
                     if (testsVerified)
                     {
@@ -258,7 +258,7 @@ public class DedicatedTestServer extends DedicatedServer
     protected void waitUntilNextTick()
     {
         runAllTasks();
-        managedBlock(() -> !haveTime());
+        managedBlock(() -> !haveTimeShadow());
     }
 
     /**
@@ -283,8 +283,9 @@ public class DedicatedTestServer extends DedicatedServer
 
     /**
      * Use shadowed fields, and the superclass method is private
+     * Hint: There is an issue with Forge de/obfuscation if this method is called "haveTime". https://github.com/alcatrazEscapee/mcjunitlib/issues/2
      */
-    private boolean haveTime()
+    private boolean haveTimeShadow()
     {
         return runningTask() || Util.getMillis() < (mayHaveDelayedTasks ? delayedTasksMaxNextTickTime : nextTickTime);
     }
