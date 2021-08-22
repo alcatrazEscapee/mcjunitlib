@@ -1,19 +1,24 @@
 buildscript {
     repositories {
-        maven { url = 'https://files.minecraftforge.net/maven' }
-        jcenter()
+        maven { url = 'https://maven.minecraftforge.net' }
+        maven { url = 'https://maven.parchmentmc.org' }
         mavenCentral()
     }
     dependencies {
-        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '3.+', changing: true
+        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '5.1.+', changing: true
+        classpath 'org.parchmentmc:librarian:1.+'
     }
 }
 
 plugins {
-    id 'idea'
+    id 'org.cadixdev.licenser' version '0.6.1'
     id 'maven-publish'
+	id 'idea'
+    id 'java'
 }
+
 apply plugin: 'net.minecraftforge.gradle'
+apply plugin: 'org.parchmentmc.librarian.forgegradle'
 
 // Allow local mappings customization
 def localProperties = new File('./dev.gradle')
@@ -22,95 +27,75 @@ localProperties.createNewFile()
 apply from: 'dev.gradle'
 
 def mappingsChannel = project.hasProperty('mappings_channel') ? mappings_channel : 'official'
-def mappingsVersion = project.hasProperty('mappings_version') ? mappings_version : mc_version
+def mappingsVersion = project.hasProperty('mappings_version') ? mappings_version : minecraft_version
 println 'Using mappings: ' + mappingsChannel + ' / ' + mappingsVersion
 
-// Use version from environment variable, if set
-def envVersion = System.getenv('VERSION')
-version = envVersion == null ? 'indev' : envVersion
+version = '0.4-1.17.1'
 
-group = 'com.github.alcatrazEscapee'
-archivesBaseName = 'mcjunitlib'
-
-sourceCompatibility = targetCompatibility = compileJava.sourceCompatibility = compileJava.targetCompatibility = '1.8' // Need this here so eclipse task generates correctly.
+group = 'com.alcatrazescapee.mcjunitlib'
+archivesBaseName = "mcjunitlib-${minecraft_version}"
+java.toolchain.languageVersion = JavaLanguageVersion.of(16)
 
 minecraft {
     mappings channel: mappingsChannel, version: mappingsVersion
+    //accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
 }
 
 repositories {
-    mavenLocal()
-    mavenCentral()
-}
-
-configurations {
-    // Implementation dependencies that should also be packaged in the fat jar
-    implementation.extendsFrom(implementationPackage)
+	mavenLocal()
+    // flatDir {
+	//     dirs 'libs'
+	// }
 }
 
 dependencies {
-    minecraft "net.minecraftforge:forge:${mc_version}-${forge_version}"
+    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 
-    implementationPackage 'org.junit.platform:junit-platform-launcher:1.6.2'
-    implementationPackage 'org.junit.jupiter:junit-jupiter-api:5.4.2'
-    implementationPackage 'org.junit.jupiter:junit-jupiter-engine:5.4.2'
-    implementationPackage 'org.junit.jupiter:junit-jupiter-params:5.4.2'
+    implementation(localGroovy())
+
+    implementation 'org.junit.platform:junit-platform-launcher:1.6.2'
+    implementation 'org.junit.jupiter:junit-jupiter-api:5.4.2'
+    implementation 'org.junit.jupiter:junit-jupiter-engine:5.4.2'
+
+	// if (System.getProperty("idea.sync.active") != "true") {
+    //     annotationProcessor "org.spongepowered:mixin:${mixin_version}:processor"
+    //}
 }
 
 jar {
     manifest {
         attributes([
-                "Implementation-Version": "${version}",
-                "FMLModType": "LIBRARY"
+            "Implementation-Version": "${project.version}",
+            "FMLModType": "LIBRARY"
+            // "MixinConfigs": "${mod_id}.mixins.json"
         ])
     }
-    // Include the full JUnit classpath in the jar
-    // This is done so the TransformingClassLoader will properly load these classes and not cause classloading leaks into test code or minecraft source code
-    // It also means it's easier to specify dependencies on this project, as transitive dependencies do not work correctly with fg.deobf()
-    from {
-        configurations.implementationPackage.filter({ File file ->
-            file.exists()
-        }).collect({ File file ->
-            file.isDirectory() ? file : zipTree(file)
-        })
-    }
 }
 
-jar.finalizedBy('reobfJar')
 
-if (JavaVersion.current().isJava8Compatible()) {
-    tasks.withType(Javadoc) {
-        options.addStringOption('Xdoclint:none', '-quiet')
-    }
+// mixin {
+//     add sourceSets.main, "${mod_id}.refmap.json"
+//}
+
+// Automatically apply a license header when running checkLicense / updateLicense
+license {
+    header = project.file('HEADER.txt')
+
+    include '**/*.java'
 }
 
-task sourcesJar(type: Jar) {
-    from sourceSets.main.allJava
-    classifier = 'sources'
-}
-
-task javadocJar(type: Jar) {
-    from javadoc
-    classifier = 'javadoc'
+java {
+    withSourcesJar()
 }
 
 publishing {
     publications {
         mavenJava(MavenPublication) {
             from components.java
-            artifact sourcesJar
-            artifact javadocJar
 
             groupId = 'com.github.alcatrazEscapee'
             artifactId = "mcjunitlib"
             version = "${version}"
-
-            // Filter any dependencies from appearing in the pom.xml
-            pom.withXml {
-                asNode().dependencies.dependency.each { dep ->
-                    assert dep.parent().remove(dep)
-                }
-            }
         }
     }
     repositories {

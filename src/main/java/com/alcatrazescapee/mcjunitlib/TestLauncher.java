@@ -16,9 +16,8 @@ import org.apache.logging.log4j.Logger;
 
 import cpw.mods.modlauncher.Launcher;
 
-public class DedicatedTestServerLauncher
+public class TestLauncher
 {
-    private static final Level UNIT_TEST = Level.forName("UNITTEST", 50);
     private static final Logger LOGGER = LogManager.getLogger();
 
     public static void main(String[] args)
@@ -26,12 +25,12 @@ public class DedicatedTestServerLauncher
         final String markerSelection = System.getProperty("forge.logging.markers", "");
         Arrays.stream(markerSelection.split(",")).forEach(marker -> System.setProperty("forge.logging.marker."+ marker.toLowerCase(Locale.ROOT), "ACCEPT"));
 
-        LOGGER.log(UNIT_TEST, "TestServerLauncher Starting");
+        LOGGER.info("TestServerLauncher Starting");
         String[] arguments;
         try
         {
             // Since forge made this class package private, and I don't care to copy paste, here we go with a pile of reflection!
-            Class<?> argListClass = Class.forName("net.minecraftforge.userdev.ArgumentList");
+            Class<?> argListClass = Class.forName("net.minecraftforge.fml.loading.targets.ArgumentList");
             Method constructor = argListClass.getMethod("from", String[].class);
             Method putLazy = argListClass.getMethod("putLazy", String.class, String.class);
             Method getArguments = argListClass.getMethod("getArguments");
@@ -52,12 +51,12 @@ public class DedicatedTestServerLauncher
             putLazy.invoke(argumentList, "launchTarget", "fmltestserver");
 
             arguments = (String[]) getArguments.invoke(argumentList);
-            LOGGER.log(UNIT_TEST, "Launching Launcher with arguments: " + String.join(", ", arguments));
+            LOGGER.info("Launching Launcher with arguments: " + String.join(", ", arguments));
         }
         catch (InvocationTargetException | NoSuchMethodException | IllegalAccessException | ClassNotFoundException e)
         {
-            LOGGER.log(UNIT_TEST, "Forge is calling, they want their ArgumentList back. This is a bug!");
-            LOGGER.log(UNIT_TEST, "Error: ", e);
+            LOGGER.info("Forge is calling, they want their ArgumentList back. This is a bug!");
+            LOGGER.info("Error: ", e);
             return;
         }
 

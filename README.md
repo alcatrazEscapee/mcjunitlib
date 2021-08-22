@@ -47,7 +47,7 @@ def testClasses = String.join(File.pathSeparator,
 serverTest {
     parent runs.server // This run config inherits settings from the server config
     workingDirectory project.file('run')
-    main 'com.alcatrazescapee.mcjunitlib.DedicatedTestServerLauncher' // The main class which launches a customized server which then runs JUnit tests
+    main 'com.alcatrazescapee.mcjunitlib.TestLauncher' // The main class which launches a customized server which then runs JUnit tests
     ideaModule "${project.name}.test" // Tell IDEA to use the classpath of the test module
     property 'forge.logging.console.level', 'unittest' // This logging level prevents any other server information messages and leaves only the test output
     environment 'MOD_CLASSES', testClasses

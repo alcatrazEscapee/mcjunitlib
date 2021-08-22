@@ -1,72 +1,50 @@
 package com.alcatrazescapee.mcjunitlib;
 
 import java.io.File;
-import java.net.Proxy;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import net.minecraft.block.Blocks;
-import net.minecraft.command.Commands;
-import net.minecraft.crash.CrashReport;
-import net.minecraft.nbt.INBT;
-import net.minecraft.nbt.NBTDynamicOps;
-import net.minecraft.resources.*;
+import net.minecraft.CrashReport;
+import net.minecraft.DefaultUncaughtExceptionHandler;
+import net.minecraft.SharedConstants;
+import net.minecraft.Util;
+import net.minecraft.commands.Commands;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.server.Bootstrap;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.ServerPropertiesProvider;
-import net.minecraft.server.dedicated.PropertyManager;
-import net.minecraft.server.dedicated.ServerProperties;
-import net.minecraft.server.management.PlayerProfileCache;
-import net.minecraft.util.DefaultUncaughtExceptionHandler;
-import net.minecraft.util.Util;
-import net.minecraft.util.datafix.DataFixesManager;
-import net.minecraft.util.datafix.codec.DatapackCodec;
-import net.minecraft.util.registry.*;
-import net.minecraft.world.*;
-import net.minecraft.world.biome.Biome;
-import net.minecraft.world.biome.Biomes;
-import net.minecraft.world.chunk.listener.LoggingChunkStatusListener;
-import net.minecraft.world.gen.DimensionSettings;
-import net.minecraft.world.gen.FlatChunkGenerator;
-import net.minecraft.world.gen.FlatGenerationSettings;
-import net.minecraft.world.gen.FlatLayerInfo;
-import net.minecraft.world.gen.settings.DimensionGeneratorSettings;
-import net.minecraft.world.gen.settings.DimensionStructuresSettings;
-import net.minecraft.world.storage.FolderName;
-import net.minecraft.world.storage.IServerConfiguration;
-import net.minecraft.world.storage.SaveFormat;
-import net.minecraft.world.storage.ServerWorldInfo;
-import net.minecraftforge.fml.common.ObfuscationReflectionHelper;
-import net.minecraftforge.fml.server.ServerModLoader;
+import net.minecraft.server.ServerResources;
+import net.minecraft.server.dedicated.DedicatedServerProperties;
+import net.minecraft.server.dedicated.DedicatedServerSettings;
+import net.minecraft.server.dedicated.Settings;
+import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.repository.FolderRepositorySource;
+import net.minecraft.server.packs.repository.PackRepository;
+import net.minecraft.server.packs.repository.PackSource;
+import net.minecraft.server.packs.repository.ServerPacksSource;
+import net.minecraft.world.level.*;
+import net.minecraft.world.level.storage.*;
 
-import com.alcatrazescapee.mcjunitlib.framework.IntegrationTestManager;
-import com.mojang.authlib.GameProfileRepository;
-import com.mojang.authlib.minecraft.MinecraftSessionService;
-import com.mojang.authlib.yggdrasil.YggdrasilAuthenticationService;
-import com.mojang.serialization.Lifecycle;
+import net.minecraftforge.fml.util.ObfuscationReflectionHelper;
+import net.minecraftforge.fmllegacy.server.ServerModLoader;
+
 import joptsimple.OptionParser;
-import joptsimple.OptionSet;
-import joptsimple.OptionSpec;
 
 public class TestMain
 {
-    private static final Level UNIT_TEST = Level.forName("UNITTEST", 50);
     private static final Logger LOGGER = LogManager.getLogger();
 
     private static final String TEST_WORLD = "test-world";
 
     public static void main(String[] args)
     {
-        LOGGER.log(UNIT_TEST, "TestMain launching");
-
+        SharedConstants.tryDetectVersion();
         OptionParser spec = new OptionParser();
 
-        // Consume unused options, so they don't error if used inadvertently
         spec.accepts("nogui");
         spec.accepts("initSettings", "Initializes 'server.properties' and 'eula.txt', then quits");
         spec.accepts("demo");
@@ -76,43 +54,31 @@ public class TestMain
         spec.accepts("safeMode", "Loads level with vanilla datapack only");
         spec.accepts("help").forHelp();
         spec.accepts("singleplayer").withRequiredArg();
-        OptionSpec<String> universeOption = spec.accepts("universe").withRequiredArg().defaultsTo(".");
-        OptionSpec<String> worldOption = spec.accepts("world").withRequiredArg();
+        spec.accepts("universe").withRequiredArg().defaultsTo(".");
+        spec.accepts("world").withRequiredArg();
         spec.accepts("port").withRequiredArg().ofType(Integer.class).defaultsTo(-1);
         spec.accepts("serverId").withRequiredArg();
         spec.nonOptions();
+
         spec.accepts("allowUpdates").withRequiredArg().ofType(Boolean.class).defaultsTo(Boolean.TRUE); // Forge: allow mod updates to proceed
         spec.accepts("gameDir").withRequiredArg().ofType(File.class).defaultsTo(new File(".")); //Forge: Consume this argument, we use it in the launcher, and the client side.
 
-        // Additional options, for testing purposes
-        OptionSpec<Void> crashOnFailedTestsSpec = spec.accepts("crashOnFailedTests");
-
         try
         {
-            OptionSet options = spec.parse(args);
-
             CrashReport.preload();
             Bootstrap.bootStrap();
             Bootstrap.validate();
             Util.startTimerHackThread();
-            ServerModLoader.load();
+            ServerModLoader.load(); // Load mods before we load almost anything else anymore. Single spot now.
+            RegistryAccess.RegistryHolder builtinRegistries = RegistryAccess.builtin();
 
-            // After mods have loaded, immediately setup for integration tests.
-            IntegrationTestManager.setup();
-
-            DynamicRegistries.Impl builtinRegistries = DynamicRegistries.builtin();
-
-            // Delete the old test world, we create a new one each run
-            LOGGER.log(UNIT_TEST, "Removing previous test world...");
+            LOGGER.info("Removing previous test world...");
             FileUtils.deleteDirectory(new File(TEST_WORLD));
 
-            // Edit the server.properties file before force saving it. This requires some minor reflection into the original properties object
-            final Path path = Paths.get("server.properties");
-            final ServerPropertiesProvider serverPropertiesProvider = new ServerPropertiesProvider(builtinRegistries, path);
-            final ServerProperties serverProperties = serverPropertiesProvider.getProperties();
-            final Properties properties = ObfuscationReflectionHelper.getPrivateValue(PropertyManager.class, serverProperties, "field_73672_b"); // properties
+            Path settingsPath = Paths.get("server.properties");
+            DedicatedServerSettings settingsHolder = new DedicatedServerSettings(settingsPath);
+            Properties properties = Objects.requireNonNull(ObfuscationReflectionHelper.getPrivateValue(Settings.class, settingsHolder.getProperties(), "f_139798_")); // properties
 
-            Objects.requireNonNull(properties);
             properties.setProperty("difficulty", "normal");
             properties.setProperty("enable-command-block", "true");
             properties.setProperty("gamemode", "creative");
@@ -121,81 +87,59 @@ public class TestMain
             properties.setProperty("max-tick-time", "0");
             properties.setProperty("online-mode", "false");
 
-            serverPropertiesProvider.forceSave();
+            settingsHolder.update(old -> new DedicatedServerProperties(properties)); // Same effect as forceSave()
 
-            File universeFile = new File(options.valueOf(universeOption));
-            YggdrasilAuthenticationService authService = new YggdrasilAuthenticationService(Proxy.NO_PROXY, UUID.randomUUID().toString());
-            MinecraftSessionService sessionService = authService.createMinecraftSessionService();
-            GameProfileRepository profileRepository = authService.createProfileRepository();
-            PlayerProfileCache profileCache = new PlayerProfileCache(profileRepository, new File(universeFile, MinecraftServer.USERID_CACHE_FILE.getName()));
-
-            // The world is not read from either server.properties, or the passed in options
+            File universeFile = new File(".");
             if (new File(universeFile, TEST_WORLD).getAbsolutePath().equals(new File(TEST_WORLD).getAbsolutePath()))
             {
-                LOGGER.log(UNIT_TEST, "Error: Invalid world directory specified, must not be null, empty or the same directory as your universe! " + TEST_WORLD);
+                LOGGER.error("Invalid world directory specified, must not be null, empty or the same directory as your universe! " + TEST_WORLD);
                 return;
             }
-            SaveFormat saveFormat = SaveFormat.createDefault(universeFile.toPath());
-            SaveFormat.LevelSave levelSave = saveFormat.createAccess(TEST_WORLD);
-            MinecraftServer.convertFromRegionFormatIfNeeded(levelSave);
-            DatapackCodec levelDataPacks = levelSave.getDataPacks();
+            LevelStorageSource levelStorage = LevelStorageSource.createDefault(universeFile.toPath());
+            LevelStorageSource.LevelStorageAccess levelStorageAccess = levelStorage.createAccess(TEST_WORLD);
+            LevelSummary summary = levelStorageAccess.getSummary();
+            if (summary != null && summary.isIncompatibleWorldHeight())
+            {
+                LOGGER.info("Loading of worlds with extended height is disabled.");
+                return;
+            }
 
-            ResourcePackList resourcePacks = new ResourcePackList(new ServerPackFinder(), new FolderPackFinder(levelSave.getLevelPath(FolderName.DATAPACK_DIR).toFile(), IPackNameDecorator.WORLD));
-            DatapackCodec dataPacks = MinecraftServer.configurePackRepository(resourcePacks, levelDataPacks == null ? DatapackCodec.DEFAULT : levelDataPacks, false);
-            CompletableFuture<DataPackRegistries> dataPackFuture = DataPackRegistries.loadResources(resourcePacks.openAllSelected(), Commands.EnvironmentType.DEDICATED, serverPropertiesProvider.getProperties().functionPermissionLevel, Util.backgroundExecutor(), Runnable::run);
+            DataPackConfig levelDataPacks = levelStorageAccess.getDataPacks();
+            PackRepository packRepo = new PackRepository(PackType.SERVER_DATA, new ServerPacksSource(), new FolderRepositorySource(levelStorageAccess.getLevelPath(LevelResource.DATAPACK_DIR).toFile(), PackSource.WORLD));
+            DataPackConfig dataPacks = MinecraftServer.configurePackRepository(packRepo, levelDataPacks == null ? DataPackConfig.DEFAULT : levelDataPacks, false);
+            CompletableFuture<ServerResources> serverResourcesFuture = ServerResources.loadResources(packRepo.openAllSelected(), builtinRegistries, Commands.CommandSelection.DEDICATED, settingsHolder.getProperties().functionPermissionLevel, Util.backgroundExecutor(), Runnable::run);
 
-            DataPackRegistries dataPackRegistries;
+            ServerResources serverResources;
             try
             {
-                dataPackRegistries = dataPackFuture.get();
+                serverResources = serverResourcesFuture.get();
             }
-            catch (Exception e)
+            catch (Exception exception)
             {
-                LOGGER.log(UNIT_TEST, "FATAL: Failed to load datapacks, can't proceed with server load. You can either fix your datapacks or reset to vanilla with --safeMode", e);
-                resourcePacks.close();
+                LOGGER.warn("Failed to load datapacks, can't proceed with server load. You can either fix your datapacks or reset to vanilla with --safeMode", exception);
+                packRepo.close();
                 return;
             }
 
-            dataPackRegistries.updateGlobals();
-            WorldSettingsImport<INBT> worldSettingsImport = WorldSettingsImport.create(NBTDynamicOps.INSTANCE, dataPackRegistries.getResourceManager(), builtinRegistries);
+            serverResources.updateGlobals();
+            settingsHolder.getProperties().getWorldGenSettings(builtinRegistries);
 
-            // Custom world settings, ignoring most of the options in server.properties
-            final WorldSettings worldSettings = new WorldSettings(TEST_WORLD, GameType.CREATIVE, false, Difficulty.NORMAL, true, new GameRules(), dataPacks);
+            final UnitTestServer server = MinecraftServer.spin(thread -> new UnitTestServer(thread, levelStorageAccess, packRepo, serverResources, builtinRegistries));
 
-            // Custom dimension generator settings
-            // Modified from DimensionGeneratorSettings#create
-            final long testSeed = new Random().nextLong();
-            final Registry<DimensionType> dimensionTypeRegistry = builtinRegistries.registryOrThrow(Registry.DIMENSION_TYPE_REGISTRY);
-            final Registry<Biome> biomeRegistry = builtinRegistries.registryOrThrow(Registry.BIOME_REGISTRY);
-            final Registry<DimensionSettings> dimensionSettingsRegistry = builtinRegistries.registryOrThrow(Registry.NOISE_GENERATOR_SETTINGS_REGISTRY);
-            final SimpleRegistry<Dimension> dimensionRegistry = DimensionType.defaultDimensions(dimensionTypeRegistry, biomeRegistry, dimensionSettingsRegistry, testSeed);
-
-            // Flat chunk generator. Modified from FlatPresetsScreen#<cinit>
-            LOGGER.log(UNIT_TEST, "Setting random seed: " + testSeed);
-            final List<FlatLayerInfo> layers = new ArrayList<>(Arrays.asList(new FlatLayerInfo(1, Blocks.BEDROCK), new FlatLayerInfo(2, Blocks.DIRT), new FlatLayerInfo(1, Blocks.GRASS_BLOCK)));
-            final FlatChunkGenerator chunkGenerator = new FlatChunkGenerator(new FlatGenerationSettings(biomeRegistry, new DimensionStructuresSettings(Optional.empty(), new HashMap<>()), layers, false, false, Optional.of(() -> biomeRegistry.getOrThrow(Biomes.PLAINS))));
-            final DimensionGeneratorSettings testDimensionGeneratorSettings = new DimensionGeneratorSettings(testSeed, false, false, DimensionGeneratorSettings.withOverworld(dimensionTypeRegistry, dimensionRegistry, chunkGenerator));
-
-            final IServerConfiguration serverConfiguration = new ServerWorldInfo(worldSettings, testDimensionGeneratorSettings, Lifecycle.stable());
-            levelSave.saveDataTag(builtinRegistries, serverConfiguration);
-
-            final boolean crashOnFailedTests = options.has(crashOnFailedTestsSpec);
-            final DedicatedTestServer server = MinecraftServer.spin(threadIn -> new DedicatedTestServer(threadIn, builtinRegistries, levelSave, resourcePacks, dataPackRegistries, serverConfiguration, serverPropertiesProvider, DataFixesManager.getDataFixer(), sessionService, profileRepository, profileCache, LoggingChunkStatusListener::new, crashOnFailedTests));
-
-            Thread thread = new Thread("Server Shutdown Thread")
+            Thread shutdownThread = new Thread("Server Shutdown Thread")
             {
                 public void run()
                 {
-                    server.halt(!server.crashed());
+                    server.halt(true);
                     LogManager.shutdown(); // we're manually managing the logging shutdown on the server. Make sure we do it here at the end.
                 }
             };
-            thread.setUncaughtExceptionHandler(new DefaultUncaughtExceptionHandler(LOGGER));
-            Runtime.getRuntime().addShutdownHook(thread);
+            shutdownThread.setUncaughtExceptionHandler(new DefaultUncaughtExceptionHandler(LOGGER));
+            Runtime.getRuntime().addShutdownHook(shutdownThread);
         }
         catch (Exception e)
         {
-            LOGGER.log(UNIT_TEST, "FATAL: Failed to start the minecraft server", e);
+            LOGGER.fatal("Failed to start the minecraft server", e);
         }
     }
 }
