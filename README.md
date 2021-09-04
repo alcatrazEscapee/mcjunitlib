@@ -32,7 +32,7 @@ The latest versions can be checked by looking at the [releases](https://github.c
 Note: This mod will package the JUnit 5 API as part of the mod jar. This is important - do not add a dependency on JUnit manually as Forge will only load mod classes using the transforming class loader which is required in order to access minecraft source code without everything crashing and burning.
 
 ## Adding the run configuration
-Add a new run configuration to the `build.gradle` file with the following, placed inside the `minecraft { runs }` block.
+Add a new run configuration to the `build.gradle` file with the following, placed inside the `minecraft { runs }` block. After adding this section, you will need to continue reading to add an environment variable for the system to locate your unit tests.
 
 - Make sure to replace `modid` with your mod id, or use the `${mod_id}` replacement.
 - The `arg '--crashOnFailedTests'` is optional, recommended for a CI environment, it will cause failed tests to crash the server and exit (as opposed to continuing to run the server, allowing a local player to connect and inspect failed tests).
@@ -74,7 +74,7 @@ environment 'MOD_CLASSES', testClasspaths   // target specific classpaths
 ### Use named module classpaths
 This option is similar to how Intellij and Eclipse load unit tests natively. 
 ```groovy
-def testModules = String.join(File.pathSeparator, "${mod_id}%%${mod_id}%%${project.name}.test")
+def testModules = String.join(File.pathSeparator, "${mod_id}%%${project.name}.test")
 ```
 
 And then, inside the `serverTest` block, add the following line:
