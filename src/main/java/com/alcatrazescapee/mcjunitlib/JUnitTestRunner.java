@@ -51,11 +51,26 @@ public class JUnitTestRunner implements TestExecutionListener
                 return Paths.get(splitString[splitString.length - 1]);
             })
             .collect(Collectors.toSet());
-        LOGGER.debug("Found supplied mod coordinates [{}]", modClassPaths);
+
+        String moduleNamesString = Optional.ofNullable(System.getenv("MOD_MODULES")).orElse("");
+        LOGGER.debug("Got module names {} from env", moduleNamesString);
+        Set<String> moduleNames = Arrays.stream(moduleNamesString.split(File.pathSeparator))
+                        .map(mod -> {
+                            String[] splitString = mod.split("%%", 2);
+                            return splitString[splitString.length - 1];
+                        }).collect(Collectors.toSet());
+
+        if(!modClassPaths.isEmpty())
+            LOGGER.debug("Found supplied mod coordinates [{}]", modClassPaths);
+
+        if(!moduleNames.isEmpty())
+            LOGGER.debug("Found supplied module names [{}]", moduleNames);
 
         LauncherDiscoveryRequest request = LauncherDiscoveryRequestBuilder.request()
             .selectors(DiscoverySelectors.selectClasspathRoots(modClassPaths))
+            .selectors(DiscoverySelectors.selectModules(moduleNames))
             .build();
+
         Launcher launcher = LauncherFactory.create();
         TestPlan testPlan = launcher.discover(request);
 
