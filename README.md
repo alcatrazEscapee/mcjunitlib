@@ -26,7 +26,7 @@ dependencies {
 
 The latest versions can be checked by looking at the [releases](https://github.com/alcatrazEscapee/mcjunitlib/releases) page. As of time of writing (2021-04-17), the latest versions are:
 
-- Minecraft 1.16.5: `1.4.1` (Latest)
+- Minecraft 1.16.5: `1.4.3` (Latest)
 - Minecraft 1.15.2: `1.0.1`
 
 Note: This mod will package the JUnit 5 API as part of the mod jar. This is important - do not add a dependency on JUnit manually as Forge will only load mod classes using the transforming class loader which is required in order to access minecraft source code without everything crashing and burning.
@@ -37,20 +37,16 @@ Then, in order to setup tests, the following run configuration is required:
 - The `arg '--crashOnFailedTests'` is optional, recommended for a CI environment, it will cause failed tests to crash the server and exit (as opposed to continuing to run the server, allowing a local player to connect and inspect failed tests).
 - The `forceExit = false` is optional, recommended for a CI environment, when not using the IDE run configurations.
 
-```groovy
-def testClasses = String.join(File.pathSeparator,
-        "${mod_id}%%${sourceSets.main.output.resourcesDir}",
-        "${mod_id}%%${sourceSets.main.output.classesDirs.asPath}",
-        "${mod_id}%%${sourceSets.test.output.resourcesDir}",
-        "${mod_id}%%${sourceSets.test.output.classesDirs.asPath}")
+## Adding the run configuration
+Add a new run configuration to the `build.gradle` file with the following, placed inside the `minecraft { runs }` block:
 
+```groovy
 serverTest {
     parent runs.server // This run config inherits settings from the server config
     workingDirectory project.file('run')
     main 'com.alcatrazescapee.mcjunitlib.DedicatedTestServerLauncher' // The main class which launches a customized server which then runs JUnit tests
     ideaModule "${project.name}.test" // Tell IDEA to use the classpath of the test module
     property 'forge.logging.console.level', 'unittest' // This logging level prevents any other server information messages and leaves only the test output
-    environment 'MOD_CLASSES', testClasses
     environment 'target', 'fmltestserver' // This is a custom service used to launch with ModLauncher's transforming class loader
     environment 'targetModId', "${mod_id}" // Pass the mod ID directly to mcjunitlib, to find integration test classes from the mod annotation scan data
     arg '--crashOnFailedTests' // Optional. Recommended when running in an automated environment. Without it, the server will continue running (and can be connected to via localhost) to inspect why tests failed.
@@ -61,6 +57,31 @@ serverTest {
         }
     }
 }
+```
+
+### Use specific classpath directories
+```groovy
+def testClasspaths = String.join(File.pathSeparator,
+        "${mod_id}%%${sourceSets.main.output.resourcesDir}",
+        "${mod_id}%%${sourceSets.main.output.classesDirs.asPath}",
+        "${mod_id}%%${sourceSets.test.output.resourcesDir}",
+        "${mod_id}%%${sourceSets.test.output.classesDirs.asPath}")
+```
+
+And then, inside the `serverTest` block, add the following line:
+```groovy
+environment 'MOD_CLASSES', testClasspaths   // target specific classpaths
+```
+
+### Use named module classpaths
+This option is similar to how Intellij and Eclipse load unit tests natively. 
+```groovy
+def testModules = String.join(File.pathSeparator, "${mod_id}%%${mod_id}%%${project.name}.test")
+```
+
+And then, inside the `serverTest` block, add the following line:
+```groovy
+environment 'MOD_MODULES', testModules   // target specific named modules
 ```
 
 After editing run configuration, run `genIntellijRuns` (or equivalent for your IDE) and the `runServerTest` will be generated.
