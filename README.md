@@ -24,7 +24,7 @@ dependencies {
 }
 ```
 
-The latest versions can be checked by looking at the [releases](https://github.com/alcatrazEscapee/mcjunitlib/releases) page. As of time of writing (2021-04-17), the latest versions are:
+The latest versions can be checked by looking at the [releases](https://github.com/alcatrazEscapee/mcjunitlib/releases) page. As of time of writing (2021-08-04), the latest versions are:
 
 - Minecraft 1.16.5: `1.4.3` (Latest)
 - Minecraft 1.15.2: `1.0.1`
@@ -32,7 +32,7 @@ The latest versions can be checked by looking at the [releases](https://github.c
 Note: This mod will package the JUnit 5 API as part of the mod jar. This is important - do not add a dependency on JUnit manually as Forge will only load mod classes using the transforming class loader which is required in order to access minecraft source code without everything crashing and burning.
 
 ## Adding the run configuration
-Add a new run configuration to the `build.gradle` file with the following, placed inside the `minecraft { runs }` block. After adding this section, you will need to continue reading to add an environment variable for the system to locate your unit tests.
+Add a new run configuration to the `build.gradle` file with the following, placed inside the `minecraft { runs }` block. After adding this section, continue reading to add an environment variable for the system to locate your unit tests.
 
 - Make sure to replace `modid` with your mod id, or use the `${mod_id}` replacement.
 - The `arg '--crashOnFailedTests'` is optional, recommended for a CI environment, it will cause failed tests to crash the server and exit (as opposed to continuing to run the server, allowing a local player to connect and inspect failed tests).
