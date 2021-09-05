@@ -26,7 +26,7 @@ dependencies {
 
 The latest versions can be checked by looking at the [releases](https://github.com/alcatrazEscapee/mcjunitlib/releases) page. As of time of writing (2021-09-04), the latest versions are:
 
-- Minecraft 1.16.5: `1.4.3` (Latest)
+- Minecraft 1.16.5: `1.4.4` (Latest)
 - Minecraft 1.15.2: `1.0.1`
 
 Note: This mod will package the JUnit 5 API as part of the mod jar. This is important - do not add a dependency on JUnit manually as Forge will only load mod classes using the transforming class loader which is required in order to access minecraft source code without everything crashing and burning.
