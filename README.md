@@ -24,7 +24,7 @@ dependencies {
 }
 ```
 
-The latest versions can be checked by looking at the [releases](https://github.com/alcatrazEscapee/mcjunitlib/releases) page. As of time of writing (2021-08-04), the latest versions are:
+The latest versions can be checked by looking at the [releases](https://github.com/alcatrazEscapee/mcjunitlib/releases) page. As of time of writing (2021-09-04), the latest versions are:
 
 - Minecraft 1.16.5: `1.4.3` (Latest)
 - Minecraft 1.15.2: `1.0.1`
