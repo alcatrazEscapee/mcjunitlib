@@ -30,7 +30,8 @@ def mappingsChannel = project.hasProperty('mappings_channel') ? mappings_channel
 def mappingsVersion = project.hasProperty('mappings_version') ? mappings_version : minecraft_version
 println 'Using mappings: ' + mappingsChannel + ' / ' + mappingsVersion
 
-version = '0.4-1.17.1'
+version = '1.5.7-1.17.1'
+println 'Version: ' + version
 
 group = 'com.alcatrazescapee.mcjunitlib'
 archivesBaseName = "mcjunitlib-${minecraft_version}"
@@ -38,44 +39,47 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(16)
 
 minecraft {
     mappings channel: mappingsChannel, version: mappingsVersion
-    //accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
 }
 
 repositories {
 	mavenLocal()
-    // flatDir {
-	//     dirs 'libs'
-	// }
+    mavenCentral()
+}
+
+configurations {
+    // Implementation dependencies that should also be packaged in the fat jar
+    implementation.extendsFrom(implementationPackage)
 }
 
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 
-    implementation(localGroovy())
-
-    implementation 'org.junit.platform:junit-platform-launcher:1.6.2'
-    implementation 'org.junit.jupiter:junit-jupiter-api:5.4.2'
-    implementation 'org.junit.jupiter:junit-jupiter-engine:5.4.2'
-
-	// if (System.getProperty("idea.sync.active") != "true") {
-    //     annotationProcessor "org.spongepowered:mixin:${mixin_version}:processor"
-    //}
+    implementationPackage 'org.junit.platform:junit-platform-launcher:1.6.2'
+    implementationPackage 'org.junit.jupiter:junit-jupiter-api:5.4.2'
+    implementationPackage 'org.junit.jupiter:junit-jupiter-engine:5.4.2'
 }
+
+jar.finalizedBy('reobfJar')
 
 jar {
     manifest {
         attributes([
             "Implementation-Version": "${project.version}",
             "FMLModType": "LIBRARY"
-            // "MixinConfigs": "${mod_id}.mixins.json"
         ])
     }
+
+    duplicatesStrategy DuplicatesStrategy.EXCLUDE
+
+    // Include the full JUnit classpath in the jar
+    from {
+        configurations.implementationPackage.filter({ File file ->
+            file.exists()
+        }).collect({ File file ->
+            file.isDirectory() ? file : zipTree(file)
+        })
+    }
 }
-
-
-// mixin {
-//     add sourceSets.main, "${mod_id}.refmap.json"
-//}
 
 // Automatically apply a license header when running checkLicense / updateLicense
 license {
@@ -96,6 +100,13 @@ publishing {
             groupId = 'com.github.alcatrazEscapee'
             artifactId = "mcjunitlib"
             version = "${version}"
+
+            // Filter any dependencies from appearing in the pom.xml
+            pom.withXml {
+                asNode().dependencies.dependency.each { dep ->
+                    assert dep.parent().remove(dep)
+                }
+            }
         }
     }
     repositories {

@@ -14,7 +14,7 @@ public class TestLaunchHandler extends FMLServerUserdevLaunchHandler
     @Override
     public String name()
     {
-        return "forgetestuserdev";
+        return "mcjunitlib";
     }
 
     @Override
