@@ -27,6 +27,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.BlockRayTraceResult;
 import net.minecraft.util.math.MutableBoundingBox;
 import net.minecraft.util.math.vector.Vector3d;
+import net.minecraft.util.math.vector.Vector3i;
 import net.minecraft.world.server.ServerWorld;
 import net.minecraftforge.common.util.FakePlayerFactory;
 
@@ -379,9 +380,13 @@ public class IntegrationTestHelper
         return Optional.empty();
     }
 
-    BlockPos getOrigin()
+    public BlockPos getOrigin()
     {
         return origin;
+    }
+
+    public Vector3i getTestBounds() {
+        return boundingBox.getLength();
     }
 
     IntegrationTestRunner getTest()
