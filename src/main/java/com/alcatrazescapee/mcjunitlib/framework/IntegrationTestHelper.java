@@ -385,8 +385,13 @@ public class IntegrationTestHelper
         return origin;
     }
 
-    public Vector3i getTestBounds() {
-        return boundingBox.getLength();
+    public MutableBoundingBox getTestBounds() {
+        final MutableBoundingBox moved = boundingBox.moved(1, 1, 1);
+        moved.x1--;
+        moved.y1--;
+        moved.z1--;
+
+        return moved;
     }
 
     IntegrationTestRunner getTest()
