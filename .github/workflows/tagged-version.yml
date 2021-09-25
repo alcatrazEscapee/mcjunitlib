@@ -1,4 +1,4 @@
-name: Gradle CI
+name: Gradle Tagged Version
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
 
 jobs:
   release:
-    name: Publish Nightly
+    name: Publish Build
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout
