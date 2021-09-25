@@ -23,6 +23,7 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.tileentity.TileEntityType;
 import net.minecraft.util.Direction;
 import net.minecraft.util.Hand;
+import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.BlockRayTraceResult;
 import net.minecraft.util.math.MutableBoundingBox;
@@ -385,11 +386,17 @@ public class IntegrationTestHelper
         return origin;
     }
 
+    public MutableBoundingBox getWorldBounds() {
+        MutableBoundingBox worldBounds = new MutableBoundingBox(getTestBounds());
+        worldBounds.move(origin);
+        return worldBounds;
+    }
+    
     public MutableBoundingBox getTestBounds() {
-        final MutableBoundingBox moved = boundingBox.moved(1, 1, 1);
-        moved.x1--;
-        moved.y1--;
-        moved.z1--;
+        final MutableBoundingBox moved = new MutableBoundingBox(boundingBox);
+        moved.x1 = moved.x1-1;
+        moved.y1 = moved.y1-1;
+        moved.z1 = moved.z1-1;
 
         return moved;
     }
