@@ -51,6 +51,7 @@ public class DedicatedTestServer extends DedicatedServer
     // Reflection to allow access of profiler
     private static final Field PROFILER_FIELD = ObfuscationReflectionHelper.findField(MinecraftServer.class, "field_71304_b"); // profiler
     private static final Field CONTINUOUS_PROFILER_FIELD = ObfuscationReflectionHelper.findField(MinecraftServer.class, "field_240769_m_"); // continuousProfiler
+    private final boolean keepAliveOnAllPassed;
 
     private static <T> T uncheck(Callable<T> action)
     {
@@ -77,11 +78,12 @@ public class DedicatedTestServer extends DedicatedServer
     private boolean delayProfilerStart;
     private volatile boolean isReady;
 
-    public DedicatedTestServer(Thread thread, DynamicRegistries.Impl dynamicRegistries, SaveFormat.LevelSave saveFormat, ResourcePackList resourcePacks, DataPackRegistries dataPacks, IServerConfiguration serverConfiguration, ServerPropertiesProvider serverProperties, DataFixer dataFixer, MinecraftSessionService service, GameProfileRepository profileRepository, PlayerProfileCache profileCache, IChunkStatusListenerFactory chunkStatusListenerFactory, boolean crashOnFailedTests)
+    public DedicatedTestServer(Thread thread, DynamicRegistries.Impl dynamicRegistries, SaveFormat.LevelSave saveFormat, ResourcePackList resourcePacks, DataPackRegistries dataPacks, IServerConfiguration serverConfiguration, ServerPropertiesProvider serverProperties, DataFixer dataFixer, MinecraftSessionService service, GameProfileRepository profileRepository, PlayerProfileCache profileCache, IChunkStatusListenerFactory chunkStatusListenerFactory, boolean crashOnFailedTests, boolean keepAliveOnAllPassed)
     {
         super(thread, dynamicRegistries, saveFormat, resourcePacks, dataPacks, serverConfiguration, serverProperties, dataFixer, service, profileRepository, profileCache, chunkStatusListenerFactory);
 
         this.allTestsFinished = false;
+        this.keepAliveOnAllPassed = keepAliveOnAllPassed;
         this.crashOnFailedTests = crashOnFailedTests;
         this.delayTicks = 0;
     }
@@ -168,7 +170,7 @@ public class DedicatedTestServer extends DedicatedServer
                             allTestsFinished = true;
                             LOGGER.log(UNIT_TEST, "All tests finished.");
                             boolean failures = unitTestRunner.hasFailedTests() || IntegrationTestManager.INSTANCE.hasFailedTests();
-                            if (!failures)
+                            if (!failures && !keepAliveOnAllPassed)
                             {
                                 halt(false); // All tests passed, exit gracefully
                             }
