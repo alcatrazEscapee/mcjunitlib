@@ -86,6 +86,7 @@ public class TestMain
 
         // Additional options, for testing purposes
         OptionSpec<Void> crashOnFailedTestsSpec = spec.accepts("crashOnFailedTests");
+        OptionSpec<Void> keepAliveOnAllPassedSpec = spec.accepts("keepAlive");
 
         try
         {
@@ -180,7 +181,8 @@ public class TestMain
             levelSave.saveDataTag(builtinRegistries, serverConfiguration);
 
             final boolean crashOnFailedTests = options.has(crashOnFailedTestsSpec);
-            final DedicatedTestServer server = MinecraftServer.spin(threadIn -> new DedicatedTestServer(threadIn, builtinRegistries, levelSave, resourcePacks, dataPackRegistries, serverConfiguration, serverPropertiesProvider, DataFixesManager.getDataFixer(), sessionService, profileRepository, profileCache, LoggingChunkStatusListener::new, crashOnFailedTests));
+            final boolean keepAliveOnAllPassed = options.has(keepAliveOnAllPassedSpec);
+            final DedicatedTestServer server = MinecraftServer.spin(threadIn -> new DedicatedTestServer(threadIn, builtinRegistries, levelSave, resourcePacks, dataPackRegistries, serverConfiguration, serverPropertiesProvider, DataFixesManager.getDataFixer(), sessionService, profileRepository, profileCache, LoggingChunkStatusListener::new, crashOnFailedTests, keepAliveOnAllPassed));
 
             Thread thread = new Thread("Server Shutdown Thread")
             {

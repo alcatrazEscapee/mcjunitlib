@@ -182,3 +182,11 @@ There are a few important things to note here:
 - A test class MAY be annotated with `@IntegrationTestClass` (It is not required, but recommended). If it is omitted, the class name will be used directly to infer structure names.
 - Test methods MUST be annotated with `@IntegrationTest`.
 - Test methods MUST have one parameter, of type `IntegrationTestHelper`. This is used to interact with the world directly, and characterize success and failure of the test via various `assert[Thing]` methods.
+
+
+## Arguments and Options
+
+| Argument | Type | Description
+| --- | --- | ---
+| `crashOnFailedTests` | flag | If set, the server will exit if there are failed tests.
+| `keepAlive` | flag | If set and all tests pass, keeps the server alive for inspection

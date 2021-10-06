@@ -34,6 +34,7 @@ import net.minecraftforge.forgespi.language.ModFileScanData;
 
 import com.alcatrazescapee.mcjunitlib.framework.mod.ForgeEventHandler;
 import org.objectweb.asm.Type;
+import org.opentest4j.AssertionFailedError;
 
 /**
  * Main handler for integration tests
@@ -126,11 +127,24 @@ public enum IntegrationTestManager
                 {
                     method.invoke(instance, helper);
                 }
-                catch (IllegalAccessException | InvocationTargetException e)
+                catch (IllegalAccessException e)
                 {
                     LOGGER.warn("Unable to resolve integration test at {} (Cannot Invoke Method - {})", testName, e.getMessage());
                     LOGGER.debug("Error", e);
                     helper.fail("Reflection Error: " + e.getMessage());
+                }
+                catch(InvocationTargetException e) {
+                    if(e.getTargetException() instanceof AssertionFailedError) {
+                        AssertionFailedError a = (AssertionFailedError) e.getTargetException();
+                        LOGGER.debug("Assertion Error: " + a.getMessage());
+                        helper.fail("Assertion Error: " + a.getMessage());
+                        if (a.isExpectedDefined() && a.isActualDefined())
+                            helper.fail("Expected <" + a.getExpected() + "> but got <" + a.getActual() + ">.");
+                    } else {
+                        LOGGER.warn("Unable to resolve integration test at {} (Cannot Invoke Method - {})", testName, e.getMessage());
+                        LOGGER.debug("Error", e);
+                        helper.fail("Reflection Error: " + e.getMessage());
+                    }
                 }
             }, testMethodName, templateName, typedAnnotation.refreshTicks(), typedAnnotation.timeoutTicks());
         }
